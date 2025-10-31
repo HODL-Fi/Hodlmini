@@ -11,6 +11,11 @@
   overflow: hidden;
 }
 
+@theme {
+  --breakpoint-xs: 260px;
+  --breakpoint-ss: 375px;
+  --breakpoint-sm: 412px;
+}
 
 
 body {
