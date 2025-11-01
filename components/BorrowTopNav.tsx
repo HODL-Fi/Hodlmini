@@ -1,0 +1,40 @@
+import Link from "next/link";
+import React from "react";
+import { BellIcon } from "@customIcons";
+
+type BorrowTopNavProps = {
+  title?: string;
+  subtitle?: string;
+  onBellClick?: () => void;
+};
+
+export default function BorrowTopNav({ title = "Borrow", subtitle = "Have finance without liquidating", onBellClick }: BorrowTopNavProps) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <div className="text-left">
+        <div className="text-[24px] font-semibold leading-6 tracking-tight">{title}</div>
+        <div className="mt-1 text-[12px] leading-4 text-gray-600">{subtitle}</div>
+      </div>
+      {onBellClick ? (
+        <button
+          type="button"
+          aria-label="Notifications"
+          onClick={onBellClick}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 cursor-pointer"
+        >
+          <BellIcon size={16} color="#454C52" strokeWidth={1.5} />
+        </button>
+      ) : (
+        <Link
+          href="/notifications"
+          aria-label="Notifications"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 cursor-pointer"
+        >
+          <BellIcon size={16} color="#454C52" strokeWidth={1.5} />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+
