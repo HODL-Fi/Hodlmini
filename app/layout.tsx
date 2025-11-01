@@ -57,7 +57,10 @@ export default function RootLayout({
       <body
         className={`${clashDisplay.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] pl-[max(env(safe-area-inset-left),16px)] pr-[max(env(safe-area-inset-right),16px)] pb-[calc(max(env(safe-area-inset-bottom,0px),16px)+64px)]">
+        {/* mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] pb-[calc(max(env(safe-area-inset-bottom,0px),16px)+64px)]" */}
+
+        
+        <div className="mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] pb-[calc(max(env(safe-area-inset-bottom,0px),16px)+64px)]">
           {children}
         </div>
         <BottomNav />

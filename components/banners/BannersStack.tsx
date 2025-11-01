@@ -90,7 +90,7 @@ export default function BannersStack({ className }: BannersStackProps) {
         const z = animating && pos === 0 ? items.length + 1 : items.length - pos; // keep top above during flip
 
         return (
-          <div key={`${it.key}-${pos}`} className="absolute inset-x-0 top-0" style={{ zIndex: z }}>
+          <div key={it.key} className="absolute inset-x-0 top-0" style={{ zIndex: z }}>
             <div
               className="transition-all ease-out"
               style={{
@@ -98,6 +98,10 @@ export default function BannersStack({ className }: BannersStackProps) {
                 transform,
                 opacity,
                 willChange: "transform, opacity",
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+                transformStyle: "preserve-3d",
+                WebkitTransformStyle: "preserve-3d",
               }}
             >
               <BannerCard

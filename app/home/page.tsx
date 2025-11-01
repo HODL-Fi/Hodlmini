@@ -11,7 +11,7 @@ import React from "react";
 export default function HomePage() {
   return (
     <div className="min-h-dvh">
-      <main className="px-2 py-4 text-left">
+      <main className="py-4 text-left">
         <VisibilityProvider>
         <HomeTopNav name="Jasper" />
 

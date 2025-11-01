@@ -36,8 +36,8 @@ export default function BannerCard({
           <span aria-hidden>→</span>
         </div>
       </div>
-      <div className="pointer-events-none absolute -right-2 bottom-0 translate-y-20 select-none">
-        <Image src={iconSrc} alt="" width={180} height={180} />
+      <div className="pointer-events-none absolute -right-2 bottom-0 translate-y-20 select-none" style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "translateZ(0)", willChange: "transform" }}>
+        <Image src={iconSrc} alt="" width={180} height={180} priority loading="eager" draggable={false} sizes="(max-width: 560px) 180px, 180px" />
       </div>
     </button>
   );

@@ -47,7 +47,7 @@ export default function HomeTransactionsPage() {
     );
   }, [allItems, selectedTypes, selectedStatuses]);
   return (
-    <div className="min-h-dvh px-2 py-4 text-left">
+    <div className="min-h-dvh py-4 text-left">
       <AppHeader
         title="Transactions"
         left={
