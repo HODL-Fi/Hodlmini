@@ -89,7 +89,7 @@ export default function BorrowPage() {
 
   return (
     <div className="min-h-dvh">
-      <main className="py-4 text-left">
+      <main className="px-1 py-4 text-left">
         <BorrowTopNav />
         <section className="mt-4 space-y-6">
           <div>
