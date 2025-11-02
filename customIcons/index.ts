@@ -8,6 +8,7 @@ export { default as EyeIcon } from "./EyeIcon";
 export { default as EyeOffIcon } from "./EyeOffIcon";
 export { default as ArrowLeftIcon } from "./ArrowLeftIcon";
 export { default as DotsGridIcon } from "./DotsGridIcon";
+export { default as VaultIcon } from "./VaultIcon";
 export type { IconProps } from "./types";
 
 

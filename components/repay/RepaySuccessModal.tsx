@@ -15,7 +15,7 @@ type RepaySuccessModalProps = {
 
 export default function RepaySuccessModal({ open, onClose, onViewReceipt, amount, title, message }: RepaySuccessModalProps) {
   return (
-    <Modal open={open} onClose={onClose} closeOnOverlay={false} closeOnEscape={false}>
+    <Modal open={open} onClose={onClose}>
       <div className="space-y-5">
         <div className="flex items-start justify-between">
           <div className="text-[18px] font-semibold">{title ?? "Payment received"}</div>

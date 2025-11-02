@@ -29,7 +29,7 @@ export default function RepayConfirmingModal({ open, onClose, amount, progress }
 
   return (
     <>
-      <Modal open={open} onClose={onClose} closeOnOverlay={false} closeOnEscape={false}>
+      <Modal open={open} onClose={onClose}>
         <div className="space-y-5">
         <div className="flex items-start justify-between">
           <div>
@@ -78,7 +78,7 @@ export default function RepayConfirmingModal({ open, onClose, amount, progress }
         `}</style>
         </div>
       </Modal>
-      <Modal open={confirmExitOpen} onClose={() => setConfirmExitOpen(false)} closeOnOverlay={false} closeOnEscape={false}>
+      <Modal open={confirmExitOpen} onClose={() => setConfirmExitOpen(false)}>
         <div className="space-y-3 text-center">
           <div className="text-[18px] font-semibold">Exit confirmation?</div>
           <p className="text-[14px] text-gray-600">We’re still waiting for confirmation. Do you want to leave?</p>

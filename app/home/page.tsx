@@ -1,6 +1,7 @@
 import HomeTopNav from "@/components/HomeTopNav";
 import { AccountsScroller } from "@/components/accounts";
 import { WalletIcon } from "@customIcons";
+import { VaultIcon } from "@customIcons";
 import BalanceRow from "@/components/BalanceRow";
 import { VisibilityProvider } from "@/components/visibility";
 import { QuickActions } from "@/components/quickActions";
@@ -11,9 +12,11 @@ import React from "react";
 export default function HomePage() {
   return (
     <div className="min-h-dvh">
-      <main className="px-1 py-4 text-left">
+      <main className="px-2 py-4 text-left">
         <VisibilityProvider>
-        <HomeTopNav name="Jasper" />
+        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+          <HomeTopNav name="Jasper" />
+        </div>
 
         <section className="mt-4">
           <AccountsScroller
@@ -27,19 +30,19 @@ export default function HomePage() {
               },
               {
                 id: "evm",
-                label: "EVM Wallet",
+                label: "My Wallet",
                 amount: "$22,199.09",
                 icon: <WalletIcon size={18} color="#2200FF" variant="filled" />,
                 emphasis: "primary",
                 href: "/wallet",
               },
               {
-                id: "sol",
-                label: "Solana Wallet",
-                amount: "$22,199.09",
-                icon: <WalletIcon size={18} color="#2200FF" variant="filled" />,
+                id: "vault",
+                label: "My Vault",
+                amount: "$22,199.00",
+                icon: <VaultIcon size={18} color="#2200FF" variant="filled" />,
                 emphasis: "primary",
-                href: "/coming-soon",
+                href: "/vault?sim=1",
               },
             ]), [])}
           />

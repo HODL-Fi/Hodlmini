@@ -3,7 +3,7 @@ import React from "react";
 import Link from "next/link";
 
 export type TransactionStatus = "success" | "failed" | "pending";
-export type TransactionType = "borrow" | "repay" | "earn" | "add" | "convert";
+export type TransactionType = "borrow" | "repay" | "earn" | "add" | "convert" | "send" | "receive" | "swap";
 
 export type TransactionItemProps = {
   id: string;
@@ -22,6 +22,9 @@ const typeToDefaults: Record<TransactionType, { title: string; icon: string }> =
   earn: { title: "Earnings", icon: "/icons/arrow-trending-up.svg" },
   add: { title: "Added funds", icon: "/icons/plus.svg" },
   convert: { title: "Converted", icon: "/icons/convert.svg" },
+  send: { title: "Sent", icon: "/icons/arrow-up-right.svg" },
+  receive: { title: "Received", icon: "/icons/arrow-down-left.svg" },
+  swap: { title: "Swap", icon: "/icons/swap.svg" },
 };
 
 export default function TransactionItem({ id, title, type, amount, timestamp, status = "success", iconSrc, href }: TransactionItemProps) {
