@@ -13,7 +13,7 @@ export default function AppHeader({ title = "Hodl Mini", left, right, fixed = fa
     : "sticky top-0 z-10";
   return (
     <header className={`${positionClass} bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60`}>
-      <div className="flex h-12 items-center justify-between">
+      <div className="flex h-12 items-center justify-between px-3">
         <div className="flex items-center gap-3">
           {left}
           <h1 className="text-base font-semibold">{title}</h1>

@@ -14,6 +14,7 @@ type AccountPillProps = {
   onClick?: () => void;
   className?: string;
   href?: string;
+  iconBgClassName?: string;
 };
 
 export default function AccountPill({
@@ -26,6 +27,7 @@ export default function AccountPill({
   onClick,
   className,
   href,
+  iconBgClassName,
 }: AccountPillProps) {
   const { hidden } = useVisibility();
   const containerClasses =
@@ -33,8 +35,9 @@ export default function AccountPill({
       ? "bg-white/90 border border-gray-200"
       : "bg-gray-100 border border-gray-200";
 
-  const iconWrapClasses =
-    emphasis === "primary"
+  const iconWrapClasses = iconBgClassName
+    ? iconBgClassName
+    : emphasis === "primary"
       ? "bg-[#E6DEFF]"
       : "bg-gray-300";
 

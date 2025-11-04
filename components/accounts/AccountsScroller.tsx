@@ -11,6 +11,7 @@ export type AccountItem = {
   verified?: boolean;
   onClick?: () => void;
   href?: string;
+  iconBgClassName?: string;
 };
 
 type AccountsScrollerProps = {
@@ -111,6 +112,7 @@ export default function AccountsScroller({ items, className }: AccountsScrollerP
             verified={it.verified}
             onClick={it.onClick}
             href={it.href}
+            iconBgClassName={it.iconBgClassName}
           />
         ))}
       </div>

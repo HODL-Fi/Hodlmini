@@ -15,7 +15,7 @@ import HealthBar from "@/components/HeathBar";
 
 export default function BorrowPage() {
   return (
-    <React.Suspense fallback={<div className="min-h-dvh px-2 py-4 text-left">Loading…</div>}>
+    <React.Suspense fallback={<div className="min-h-dvh px-3 text-left">Loading…</div>}>
       <BorrowPageInner />
     </React.Suspense>
   );
@@ -24,6 +24,8 @@ export default function BorrowPage() {
 function BorrowPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
   const modeParam = searchParams?.get("mode") ?? undefined; // existing | new
   const isExistingMode = modeParam === "existing";
   const borrowResultParam = (searchParams?.get("borrowResult") ?? "success").toLowerCase(); // success|fail
@@ -189,9 +191,17 @@ function BorrowPageInner() {
     };
   }, [collateralExpanded]);
 
+  if (!mounted) {
+    return (
+      <div className="min-h-dvh">
+        <main className="px-3 text-left" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh">
-      <main className="px-2 py-4 text-left">
+      <main className="px-3 text-left">
         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
           <BorrowTopNav />
         </div>
@@ -241,9 +251,7 @@ function BorrowPageInner() {
                     type="button"
                     className="text-[13px] text-[#2200FF] underline underline-offset-4 cursor-pointer"
                     onClick={() => {
-                      const sp = new URLSearchParams(Array.from(searchParams?.entries?.() ?? []));
-                      sp.set("mode", "new");
-                      router.push(`/borrow?${sp.toString()}`);
+                      router.push("/vault?sim=1");
                     }}
                   >
                     Manage collateral

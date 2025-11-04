@@ -9,6 +9,7 @@ import RepayModal from "@/components/repay/RepayModal";
 import RepayConfirmingModal from "@/components/repay/RepayConfirmingModal";
 import RepayFailedModal from "@/components/repay/RepayFailedModal";
 import RepaySuccessModal from "@/components/repay/RepaySuccessModal";
+import { CustomInput } from "@/components/inputs";
 
 export default function RepayLoanDetailPage() {
   const params = useParams();
@@ -16,6 +17,16 @@ export default function RepayLoanDetailPage() {
   const search = useSearchParams();
   const router = useRouter();
   const amount = "₦100,000.00";
+  const outstandingNumeric = React.useMemo(() => {
+    const n = parseFloat(amount.replace(/[₦,\s]/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  }, [amount]);
+  const [repayAmount, setRepayAmount] = React.useState("");
+  const repayNumeric = React.useMemo(() => parseFloat((repayAmount || "").replace(/,/g, "")), [repayAmount]);
+  const repayValid = Number.isFinite(repayNumeric) && repayNumeric > 0 && repayNumeric <= outstandingNumeric;
+  function formatNaira(n: number) {
+    return `₦${new Intl.NumberFormat("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
+  }
   const date = "18 Sep at 12:20PM";
   const status = (search.get("status") ?? "pending") as "pending" | "paid";
   const [open, setOpen] = React.useState(false);
@@ -91,13 +102,47 @@ export default function RepayLoanDetailPage() {
           <Row left="Transaction date" right={date} />
           <Row left="Transaction type" right="Money borrowed" />
         </div>
+
+        {status === "pending" && (
+          <div className="mt-6 rounded-[16px] border border-gray-200 bg-white p-4">
+            <div className="flex items-center justify-between text-[14px]">
+              <div className="text-gray-600">Amount to repay</div>
+              <button
+                type="button"
+                className="text-[#2200FF] cursor-pointer"
+                onClick={() => setRepayAmount(String(outstandingNumeric))}
+              >
+                Max
+              </button>
+            </div>
+            <div className="mt-2">
+              <CustomInput
+                value={repayAmount}
+                onChange={setRepayAmount}
+                tokenLabel="NGN"
+                tokenIconSrc="/fiat/ngn.svg"
+                onDropdownClick={() => { /* future: change fiat */ }}
+                invalid={Boolean(repayAmount) && !repayValid}
+              />
+            </div>
+            <div className="mt-2 text-[12px] text-gray-600">
+              Outstanding: <span className="font-medium">{amount}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="fixed inset-x-0 z-10 bottom-[calc(max(env(safe-area-inset-bottom),8px)+64px)]">
         <div className="mx-auto w-full max-w-[560px] bg-white/80 px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 backdrop-blur supports-[backdrop-filter]:bg-white/60">
           {status === "pending" ? (
             <div className="flex items-center gap-2">
-              <button onClick={() => setOpen(true)} className="w-full rounded-[20px] bg-[#2200FF] px-4 py-3 text-[14px] font-medium text-white text-center cursor-pointer">Repay now</button>
+              <button
+                onClick={() => setOpen(true)}
+                disabled={!repayValid}
+                className={`w-full rounded-[20px] px-4 py-3 text-[14px] font-medium text-center ${repayValid ? "bg-[#2200FF] text-white cursor-pointer" : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}
+              >
+                Repay now
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -112,7 +157,7 @@ export default function RepayLoanDetailPage() {
           <RepayModal
             open={open}
             onClose={() => setOpen(false)}
-            amount={amount}
+            amount={repayValid ? formatNaira(repayNumeric) : amount}
             accountNumber="0123498765"
             bankName="Paystack-Titan Bank"
             accountName="PAYSTACK-PAYOUT"
@@ -126,7 +171,7 @@ export default function RepayLoanDetailPage() {
           <RepayConfirmingModal
             open={confirming}
             onClose={() => setConfirming(false)}
-            amount={amount}
+            amount={repayValid ? formatNaira(repayNumeric) : amount}
             progress={confirmingProgress}
           />
           <RepayFailedModal
@@ -142,7 +187,7 @@ export default function RepayLoanDetailPage() {
           <RepaySuccessModal
             open={success}
             onClose={() => setSuccess(false)}
-            amount={amount}
+            amount={repayValid ? formatNaira(repayNumeric) : amount}
             onViewReceipt={() => {
               setSuccess(false);
               router.push(`/home/transactions/${id}?type=repaid&status=success`);

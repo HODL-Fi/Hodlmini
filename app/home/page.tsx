@@ -1,5 +1,8 @@
+"use client";
+
 import HomeTopNav from "@/components/HomeTopNav";
 import { AccountsScroller } from "@/components/accounts";
+import GlobalAccountsScroller from "@/components/accounts/GlobalAccountsScroller";
 import { WalletIcon } from "@customIcons";
 import { VaultIcon } from "@customIcons";
 import BalanceRow from "@/components/BalanceRow";
@@ -8,54 +11,30 @@ import { QuickActions } from "@/components/quickActions";
 import { BannersStack } from "@/components/banners";
 import { TransactionsList } from "@/components/transactions";
 import React from "react";
+import AddFundsModal from "@/components/home/AddFundsModal";
 
 export default function HomePage() {
+  const [addOpen, setAddOpen] = React.useState(false);
   return (
     <div className="min-h-dvh">
-      <main className="px-2 py-4 text-left">
+      <main className="px-3 text-left">
         <VisibilityProvider>
         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
           <HomeTopNav name="Jasper" />
         </div>
 
         <section className="mt-4">
-          <AccountsScroller
-            items={React.useMemo(() => ([
-              {
-                id: "limit",
-                label: "Spend Limit",
-                amount: "₦1,000,00.76",
-                icon: <WalletIcon size={18} color="#111" strokeWidth={1.8} />,
-                verified: true,
-              },
-              {
-                id: "evm",
-                label: "My Wallet",
-                amount: "$22,199.09",
-                icon: <WalletIcon size={18} color="#2200FF" variant="filled" />,
-                emphasis: "primary",
-                href: "/wallet",
-              },
-              {
-                id: "vault",
-                label: "My Vault",
-                amount: "$22,199.00",
-                icon: <VaultIcon size={18} color="#2200FF" variant="filled" />,
-                emphasis: "primary",
-                href: "/vault?sim=1",
-              },
-            ]), [])}
-          />
+          <GlobalAccountsScroller />
         </section>
 
         <section className="mt-6">
-          <BalanceRow label="Loan balance" amount="-₦1,000,00.76" />
+          <BalanceRow label="Available to Borrow" amount="₦1,000,000.76" secondary="≈$666.67" />
         </section>
         
         <section className="mt-6">
           <QuickActions
             items={React.useMemo(() => ([
-              { key: "add", iconSrc: "/icons/plus.svg", label: "Add" },
+              { key: "add", iconSrc: "/icons/plus.svg", label: "Add", onClick: () => setAddOpen(true) },
               { key: "borrow", iconSrc: "/icons/arrow-down-right.svg", label: "Borrow", href: "/borrow" },
               { key: "repay", iconSrc: "/icons/arrow-down-tray.svg", label: "Repay", href: "/repayments" },
               { key: "earn", iconSrc: "/icons/arrow-trending-up.svg", label: "Earn", href: "/coming-soon" },
@@ -79,6 +58,7 @@ export default function HomePage() {
             ]), [])}
           />
         </section>
+        <AddFundsModal open={addOpen} onClose={() => setAddOpen(false)} />
         </VisibilityProvider>
         
       

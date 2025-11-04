@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import BottomNav from "@/components/BottomNav";
+import AppShell from "@/components/AppShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,11 +59,9 @@ export default function RootLayout({
       >
         {/* mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] pb-[calc(max(env(safe-area-inset-bottom,0px),16px)+64px)]" */}
 
-        
-        <div className="mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] pb-[calc(max(env(safe-area-inset-bottom,0px),16px)+64px)]">
+        <AppShell>
           {children}
-        </div>
-        <BottomNav />
+        </AppShell>
       </body>
     </html>
   );

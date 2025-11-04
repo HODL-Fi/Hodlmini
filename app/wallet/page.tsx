@@ -4,6 +4,7 @@ import React from "react";
 import { VisibilityProvider } from "@/components/visibility";
 import BorrowTopNav from "@/components/BorrowTopNav";
 import { AccountsScroller } from "@/components/accounts";
+import GlobalAccountsScroller from "@/components/accounts/GlobalAccountsScroller";
 import BalanceRow from "@/components/BalanceRow";
 import { QuickActions } from "@/components/quickActions";
 import { WalletIcon, VaultIcon } from "@customIcons";
@@ -66,40 +67,14 @@ export default function WalletPage() {
 
   return (
     <div className="min-h-dvh">
-      <main className="px-2 py-4 text-left">
+      <main className="px-3 text-left">
         <VisibilityProvider>
           <div className="sticky top-0 z-20 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
             <BorrowTopNav title="Wallet" subtitle="Manage multiple wallets in one place" />
           </div>
 
           <section className="mt-4">
-            <AccountsScroller
-              items={React.useMemo(() => ([
-                {
-                  id: "fiat",
-                  label: "Fiat Wallet",
-                  amount: "₦1,000,00.76",
-                  icon: <WalletIcon size={18} color="#111" strokeWidth={1.8} />,
-                },
-                {
-                  id: "evm",
-                  label: "EVM Wallet",
-                  amount: "$22,199.09",
-                  icon: <WalletIcon size={18} color="#2200FF" variant="filled" />,
-                  emphasis: "primary",
-                  verified: true,
-                  href: "/wallet",
-                },
-                {
-                  id: "vault",
-                  label: "My Vault",
-                  amount: "$22,199.09",
-                  icon: <VaultIcon size={18} color="#2200FF" variant="filled" />,
-                  emphasis: "primary",
-                  href: "/vault?sim=1",
-                },
-              ]), [])}
-            />
+            <GlobalAccountsScroller />
           </section>
 
           <section className="mt-6">

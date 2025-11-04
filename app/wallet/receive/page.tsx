@@ -22,14 +22,52 @@ export default function ReceivePage() {
   const [chainOpen, setChainOpen] = React.useState(false);
   const [selectedAsset, setSelectedAsset] = React.useState(ASSETS[0]);
   const [selectedChain, setSelectedChain] = React.useState(CHAINS[0]);
-  const address = React.useMemo(() => `0xABCD...${selectedChain.key}`, [selectedChain]);
-  const copy = (txt: string) => { try { navigator.clipboard?.writeText(txt); } catch {} };
+  const address = React.useMemo(() => {
+    // Demo full addresses per chain (static for now)
+    const map: Record<string, string> = {
+      ETH: "0x5A1b2C3D4E5F6A7B8C9D00112233445566778899",
+      BSC: "0xBEEfBEEF00001111222233334444555566667777",
+      LSK: "0x1111222233334444555566667777888899990000",
+      BASE: "0xABCDEFabcdefABCDEFabcdefABCDEFabcdef1234",
+    };
+    return map[selectedChain.key] || map.ETH;
+  }, [selectedChain]);
+  const [hint, setHint] = React.useState<string | null>(null);
+  const copy = async (txt: string) => {
+    try { await navigator.clipboard?.writeText(txt); setHint("Address copied"); setTimeout(()=>setHint(null), 1200); } catch {}
+  };
+  const share = async () => {
+    const msg = `${selectedAsset.symbol} ${selectedChain.name} address:\n${address}`;
+    try {
+      const anyNav: any = navigator as any;
+      if (typeof anyNav?.share === "function") {
+        await anyNav.share({ title: `${selectedAsset.symbol} address`, text: msg });
+        setHint("Share sheet opened");
+        setTimeout(()=>setHint(null), 1200);
+        return;
+      }
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(msg);
+        setHint("Address copied (share unavailable)");
+        setTimeout(()=>setHint(null), 1200);
+        return;
+      }
+      // Fallback to mailto
+      window.location.href = `mailto:?subject=${encodeURIComponent(`${selectedAsset.symbol} address`)}&body=${encodeURIComponent(msg)}`;
+    } catch {
+      try {
+        await navigator.clipboard?.writeText(msg);
+        setHint("Address copied");
+        setTimeout(()=>setHint(null), 1200);
+      } catch {}
+    }
+  };
 
   return (
     <div className="min-h-dvh">
-      <main className="px-2 py-4 text-left">
+      <main className="px-3 text-left">
         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-          <BorrowTopNav title="Receive" subtitle="Deposit assets into your wallet" />
+          <BorrowTopNav title="Receive" subtitle="Deposit assets into your wallet" showBack />
         </div>
 
         <section className="mt-4 space-y-4">
@@ -48,12 +86,20 @@ export default function ReceivePage() {
             </button>
           </div>
           <div className="rounded-[16px] border border-gray-200 bg-white p-4 text-center">
-            <div className="mx-auto mb-3 h-40 w-40 rounded-xl bg-gray-100 text-gray-500 grid place-items-center text-sm">QR</div>
-            <div className="text-[14px] font-mono">{address}</div>
-            <div className="mt-2 flex items-center justify-center gap-2">
-              <button className="rounded-full bg-gray-100 px-3 py-1.5 text-[12px]" onClick={()=>copy(address)}>Copy address</button>
-              <button className="rounded-full bg-gray-100 px-3 py-1.5 text-[12px]">Share</button>
+            <div className="mx-auto mb-3 h-40 w-40 overflow-hidden rounded-xl bg-white grid place-items-center">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(address)}`}
+                alt="QR Code"
+                width={160}
+                height={160}
+              />
             </div>
+            <div className="text-[14px] font-mono break-all">{address}</div>
+            <div className="mt-2 flex items-center justify-center gap-2">
+              <button className="rounded-full bg-gray-100 px-3 py-1.5 text-[12px] hover:bg-[#2200FF] hover:text-white" onClick={()=>copy(address)}>Copy address</button>
+              <button className="rounded-full bg-gray-100 px-3 py-1.5 text-[12px] hover:bg-[#2200FF] hover:text-white" onClick={share}>Share</button>
+            </div>
+            {hint && <div className="mt-2 text-[12px] text-gray-600">{hint}</div>}
           </div>
         </section>
 

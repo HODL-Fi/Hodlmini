@@ -13,9 +13,9 @@ export default function WalletHistoryPage() {
   ]), []);
   return (
     <div className="min-h-dvh">
-      <main className="px-2 py-4 text-left">
+      <main className="px-3 text-left">
         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-          <BorrowTopNav title="History" subtitle="Your recent wallet activity" />
+          <BorrowTopNav title="History" subtitle="Your recent wallet activity" showBack />
         </div>
         <section className="mt-4">
           <TransactionsList items={all as any} linkBase="/home/transactions" />

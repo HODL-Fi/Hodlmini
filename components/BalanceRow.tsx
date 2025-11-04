@@ -10,17 +10,25 @@ type BalanceRowProps = {
   negative?: boolean; // overrides auto-detect
   className?: string;
   href?: string;
+  secondary?: string; // optional small text beside main amount (e.g., USD equivalent)
 };
 
-export default function BalanceRow({ label, amount, negative, className, href }: BalanceRowProps) {
+export default function BalanceRow({ label, amount, negative, className, href, secondary }: BalanceRowProps) {
   const { hidden, toggle } = useVisibility();
   const isNegative = negative ?? /-/.test(amount);
   const content = (
     <div className={`${className ?? ""}`}>
       <div className="text-[12px] font-medium text-gray-600">{label}</div>
       <div className="mt-1 flex items-center gap-2">
-        <div className={`text-[28px] font-semibold tracking-tight ${isNegative ? "text-[#F34141]" : "text-gray-900"}`}>
-          {hidden ? "********" : amount}
+        <div className="flex items-baseline gap-2">
+          <div className={`text-[28px] font-semibold tracking-tight ${isNegative ? "text-[#F34141]" : "text-gray-900"}`}>
+            {hidden ? "********" : amount}
+          </div>
+          {secondary ? (
+            <div className="text-[12px] text-gray-600">
+              {hidden ? "***" : secondary}
+            </div>
+          ) : null}
         </div>
         <button
           type="button"
