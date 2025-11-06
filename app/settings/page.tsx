@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import BorrowTopNav from "@/components/BorrowTopNav";
 import LogoutModal from "@/components/settings/LogoutModal";
+import FontSettingsModal from "@/components/settings/FontSettingsModal";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 
@@ -20,6 +21,7 @@ type Item = {
 export default function SettingsPage() {
   const router = useRouter();
   const [logoutOpen, setLogoutOpen] = React.useState(false);
+  const [fontSettingsOpen, setFontSettingsOpen] = React.useState(false);
   const userEmail = "jasperjed@mail.xyz";
   const [delEmailOpen, setDelEmailOpen] = React.useState(false);
   const [delSureOpen, setDelSureOpen] = React.useState(false);
@@ -50,6 +52,7 @@ export default function SettingsPage() {
     },
     { key: "linked", label: "Linked accounts", icon: "/settings/building-library.svg", href: "/settings/linked" },
     { key: "notif", label: "Notification settings", icon: "/settings/bell.svg", href: "/settings/notifications" },
+    { key: "font", label: "Font", icon: "/icons/font.svg" },
     { key: "help", label: "Help", icon: "/settings/help.svg", href: "/settings/help" },
     { key: "terms", label: "Terms & privacy", icon: "/settings/document.svg", href: "/settings/terms" },
     { key: "logout", label: "Logout", icon: "/settings/power.svg" },
@@ -86,6 +89,13 @@ export default function SettingsPage() {
                 </button>
               );
             }
+            if (it.key === "font") {
+              return (
+                <button key={it.key} type="button" className="block w-full text-left hover:bg-gray-50" onClick={() => setFontSettingsOpen(true)}>
+                  {Row}
+                </button>
+              );
+            }
             if (it.key === "delete") {
               return (
                 <button key={it.key} type="button" className="block w-full text-left hover:bg-gray-50" onClick={() => { setEmailInput(""); setDelEmailOpen(true); }}>
@@ -106,6 +116,7 @@ export default function SettingsPage() {
             router.push("/home");
           }}
         />
+        <FontSettingsModal open={fontSettingsOpen} onClose={() => setFontSettingsOpen(false)} />
 
         {/* Delete email confirm */}
         <Modal open={delEmailOpen} onClose={() => setDelEmailOpen(false)}>
