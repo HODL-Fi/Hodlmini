@@ -11,9 +11,10 @@ type BalanceRowProps = {
   className?: string;
   href?: string;
   secondary?: string; // optional small text beside main amount (e.g., USD equivalent)
+  showToggle?: boolean; // show/hide the visibility toggle icon (default true)
 };
 
-export default function BalanceRow({ label, amount, negative, className, href, secondary }: BalanceRowProps) {
+export default function BalanceRow({ label, amount, negative, className, href, secondary, showToggle = true }: BalanceRowProps) {
   const { hidden, toggle } = useVisibility();
   const isNegative = negative ?? /-/.test(amount);
   const content = (
@@ -30,14 +31,16 @@ export default function BalanceRow({ label, amount, negative, className, href, s
             </div>
           ) : null}
         </div>
-        <button
-          type="button"
-          aria-label={hidden ? "Show balance" : "Hide balance"}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer hover:scale-110 transition-all duration-200"
-        >
-          {hidden ? <EyeIcon size={18} /> : <EyeOffIcon size={18} />}
-        </button>
+        {showToggle && (
+          <button
+            type="button"
+            aria-label={hidden ? "Show balance" : "Hide balance"}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer hover:scale-110 transition-all duration-200"
+          >
+            {hidden ? <EyeIcon size={18} /> : <EyeOffIcon size={18} />}
+          </button>
+        )}
       </div>
     </div>
   );
