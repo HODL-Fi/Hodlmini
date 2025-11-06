@@ -205,7 +205,7 @@ function BorrowPageInner() {
         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
           <BorrowTopNav />
         </div>
-        <section className="mt-4 space-y-6">
+        <section className="mt-4 space-y-6 pb-24 sm:pb-28">
           <div>
             <div className="flex items-center justify-between">
               <div className="text-[18px] font-semibold">I want to Collateralize</div>
