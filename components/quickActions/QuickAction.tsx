@@ -13,7 +13,7 @@ type QuickActionProps = {
 
 export default function QuickAction({ iconSrc, label, onClick, className, href }: QuickActionProps) {
   const content = (
-    <div className={`flex w-[86px] flex-col items-center gap-2 text-gray-600 ${className ?? ""}`}>
+    <div className={`flex w-[50px] sm:w-[86px] flex-col items-center gap-2 text-gray-600 ${className ?? ""}`}>
       <span className="inline-flex h-12 w-full items-center justify-center rounded-full bg-gray-100">
         <Image src={iconSrc} alt={label} width={24} height={24} />
       </span>
