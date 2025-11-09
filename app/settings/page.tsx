@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const items: Item[] = [
     { key: "profile", label: "Profile", icon: "/settings/profile.svg", href: "/settings/profile" },
     { key: "password", label: "Change password", icon: "/settings/key.svg", href: "/settings/password" },
+    { key: "referral", label: "Referral", icon: "/settings/refer.svg", href: "/settings/referral" },
     {
       key: "verifications",
       label: "Verifications",
