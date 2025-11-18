@@ -7,7 +7,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");
   const inWalletSub = pathname?.startsWith("/wallet/") && pathname !== "/wallet";
-  const hideBottomNav = Boolean(inTx || inWalletSub);
+  const inOnboarding = pathname?.startsWith("/onboarding");
+  const hideBottomNav = Boolean(inTx || inWalletSub || inOnboarding);
   const pb = hideBottomNav
     ? "pb-[calc(max(env(safe-area-inset-bottom,0px),16px)+0px)]"
     : "pb-[calc(max(env(safe-area-inset-bottom,0px),16px)+64px)]";
