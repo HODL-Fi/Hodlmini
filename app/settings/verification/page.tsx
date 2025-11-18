@@ -1,12 +1,23 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import BorrowTopNav from "@/components/BorrowTopNav";
 import Modal from "@/components/ui/Modal";
 
 type TierStatus = "not_started" | "in_progress" | "submitted" | "verified";
+type Country = "nigeria" | "kenya" | "ghana";
+
+const COUNTRIES: Array<{ key: Country; name: string; flag: string }> = [
+  { key: "nigeria", name: "Nigeria", flag: "/flags/nigeria.webp" },
+  { key: "kenya", name: "Kenya", flag: "/flags/kenya.webp" },
+  { key: "ghana", name: "Ghana", flag: "/flags/ghana.webp" },
+];
 
 export default function VerificationPage() {
+  const [country, setCountry] = React.useState<Country>("nigeria");
+  const [countryModalOpen, setCountryModalOpen] = React.useState(false);
+  
   // Simulated tier states
   const [tier0] = React.useState<TierStatus>("verified"); // default after signup
   const [tier1, setTier1] = React.useState<TierStatus>("not_started");
@@ -16,6 +27,9 @@ export default function VerificationPage() {
   const [openTier1, setOpenTier1] = React.useState(false);
   const [openTier2, setOpenTier2] = React.useState(false);
   const [openTier3, setOpenTier3] = React.useState(false);
+
+  const isNigeria = country === "nigeria";
+  const selectedCountry = COUNTRIES.find(c => c.key === country) || COUNTRIES[0];
 
   function chip(s: TierStatus) {
     const map: Record<TierStatus, string> = {
@@ -41,25 +55,46 @@ export default function VerificationPage() {
         </div>
 
         <section className="mx-auto mt-4 max-w-[560px] space-y-4">
-          <TierCard title="Tier 0" desc="Basic account (default after signup)" status={tier0}>
+          {/* Country Selector */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+            <div className="text-[14px] text-gray-600 mb-2">Select country</div>
+            <button
+              type="button"
+              onClick={() => setCountryModalOpen(true)}
+              className="flex w-full items-center justify-between rounded-[14px] border border-gray-200 bg-white px-3 py-3 text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Image src={selectedCountry.flag} alt={selectedCountry.name} width={24} height={18} className="rounded-sm" />
+                <span className="text-[14px] font-medium">{selectedCountry.name}</span>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          </div>
+
+          <TierCard title="Basic" desc="Basic account (default after signup)" status={tier0}>
             <div className="text-[12px] text-gray-600">You can explore the app but cannot transact until higher tiers are verified.</div>
           </TierCard>
 
-          <TierCard title="Tier 1" desc="BVN, NIN, phone and email verification" status={tier1}>
-            <div className="text-[12px] text-gray-600">Provide your BVN & NIN, confirm your phone and email.</div>
-            <div className="mt-2">
-              <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier1(true); setTier1("in_progress"); }}>Start</button>
-            </div>
-          </TierCard>
+          {/* Standard - Only for Nigeria */}
+          {isNigeria && (
+            <TierCard title="Standard" desc="NIN and BVN verification" status={tier1}>
+              <div className="text-[12px] text-gray-600">Provide your NIN and BVN to proceed.</div>
+              <div className="mt-2">
+                <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier1(true); setTier1("in_progress"); }}>Start</button>
+              </div>
+            </TierCard>
+          )}
 
-          <TierCard title="Tier 2" desc="Government ID and selfie / liveness" status={tier2}>
+          <TierCard title="Enhanced" desc="Government ID and selfie / liveness" status={tier2}>
             <div className="text-[12px] text-gray-600">Upload a valid ID and complete a quick liveness selfie check.</div>
             <div className="mt-2">
               <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier2(true); setTier2("in_progress"); }}>Start</button>
             </div>
           </TierCard>
 
-          <TierCard title="Tier 3" desc="Proof of address and source of funds/wealth" status={tier3}>
+          <TierCard title="Premium" desc="Proof of address and source of funds/wealth" status={tier3}>
             <div className="text-[12px] text-gray-600">Upload a recent utility bill and provide source of funds. Optionally allow location check.</div>
             <div className="mt-2">
               <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier3(true); setTier3("in_progress"); }}>Start</button>
@@ -67,6 +102,36 @@ export default function VerificationPage() {
           </TierCard>
         </section>
       </main>
+
+      {/* Country Selection Modal */}
+      <Modal open={countryModalOpen} onClose={() => setCountryModalOpen(false)}>
+        <div className="space-y-3">
+          <div className="text-[18px] font-semibold">Select country</div>
+          <div className="divide-y divide-gray-100 rounded-2xl overflow-hidden">
+            {COUNTRIES.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => {
+                  setCountry(c.key);
+                  setCountryModalOpen(false);
+                }}
+                className={`flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 ${
+                  country === c.key ? "bg-blue-50" : "bg-white"
+                }`}
+              >
+                <Image src={c.flag} alt={c.name} width={24} height={18} className="rounded-sm" />
+                <div className="text-[14px] font-medium">{c.name}</div>
+                {country === c.key && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-auto text-[#2200FF]">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Modal>
 
       <Tier1Modal open={openTier1} onClose={()=>setOpenTier1(false)} onSubmit={()=>{ setTier1("submitted"); setOpenTier1(false); }} />
       <Tier2Modal open={openTier2} onClose={()=>setOpenTier2(false)} onSubmit={()=>{ setTier2("submitted"); setOpenTier2(false); }} />
@@ -97,31 +162,19 @@ function TierCard({ title, desc, status, children }: { title: string; desc: stri
   );
 }
 
-// TIER 1 MODAL
+// STANDARD MODAL - Only NIN and BVN for Nigeria
 function Tier1Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () => void; onSubmit: () => void }) {
   const [bvn, setBvn] = React.useState("");
   const [nin, setNin] = React.useState("");
-  const [phone, setPhone] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [emailVerified, setEmailVerified] = React.useState(false);
-  const [phoneVerified, setPhoneVerified] = React.useState(false);
   const bvnOk = /^\d{11}$/.test(bvn);
   const ninOk = /^\d{11}$/.test(nin);
-  const phoneOk = phone.replace(/\D/g, "").length >= 10;
-  const emailOk = /.+@.+\..+/.test(email);
-  const canSubmit = bvnOk && ninOk && emailOk && phoneOk && emailVerified && phoneVerified;
+  const canSubmit = bvnOk && ninOk;
   return (
     <Modal open={open} onClose={onClose}>
       <div className="space-y-4">
-        <div className="text-[18px] font-semibold">Tier 1 verification</div>
+        <div className="text-[18px] font-semibold">Standard verification</div>
         <Field label="BVN" value={bvn} onChange={setBvn} placeholder="11 digits" />
         <Field label="NIN" value={nin} onChange={setNin} placeholder="11 digits" />
-        <Field label="Phone number" value={phone} onChange={setPhone} placeholder="0801 234 5678" />
-        <Field label="Email" value={email} onChange={setEmail} placeholder="name@mail.xyz" />
-        <div className="flex items-center gap-2">
-          <button type="button" className="rounded-[12px] bg-gray-100 px-3 py-2 text-[12px]" onClick={()=>setPhoneVerified(true)}>{phoneVerified?"Phone verified":"Verify phone"}</button>
-          <button type="button" className="rounded-[12px] bg-gray-100 px-3 py-2 text-[12px]" onClick={()=>setEmailVerified(true)}>{emailVerified?"Email verified":"Verify email"}</button>
-        </div>
         <div className="flex items-center justify-end gap-2">
           <button type="button" className="rounded-[14px] bg-gray-200 px-4 py-2 text-[14px]" onClick={onClose}>Cancel</button>
           <button type="button" disabled={!canSubmit} className={`rounded-[14px] px-4 py-2 text-[14px] font-medium ${canSubmit?"bg-[#2200FF] text-white":"bg-gray-200 text-gray-500"}`} onClick={onSubmit}>Submit</button>
@@ -131,7 +184,7 @@ function Tier1Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () =>
   );
 }
 
-// TIER 2 MODAL
+// ENHANCED MODAL
 function Tier2Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () => void; onSubmit: () => void }) {
   const [idType, setIdType] = React.useState("" as "drivers" | "passport" | "national" | "");
   const [idFile, setIdFile] = React.useState<File | null>(null);
@@ -141,7 +194,7 @@ function Tier2Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () =>
   return (
     <Modal open={open} onClose={onClose}>
       <div className="space-y-4">
-        <div className="text-[18px] font-semibold">Tier 2 verification</div>
+        <div className="text-[18px] font-semibold">Enhanced verification</div>
         <div>
           <div className="text-[14px] text-gray-600">Government ID</div>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -171,7 +224,7 @@ function Tier2Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () =>
   );
 }
 
-// TIER 3 MODAL
+// PREMIUM MODAL
 function Tier3Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () => void; onSubmit: () => void }) {
   const [poaFile, setPoaFile] = React.useState<File | null>(null);
   const [sof, setSof] = React.useState("");
@@ -180,7 +233,7 @@ function Tier3Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () =>
   return (
     <Modal open={open} onClose={onClose}>
       <div className="space-y-4">
-        <div className="text-[18px] font-semibold">Tier 3 verification</div>
+        <div className="text-[18px] font-semibold">Premium verification</div>
         <div>
           <div className="text-[14px] text-gray-600">Proof of address (recent utility bill)</div>
           <input type="file" accept="image/*,.pdf" className="mt-2 text-[12px]" onChange={(e)=>setPoaFile(e.target.files?.[0] ?? null)} />
