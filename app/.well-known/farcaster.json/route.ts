@@ -19,13 +19,14 @@ export async function GET() {
             "version": "1",
             "name": "Just HODL It.",
             "homeUrl": "https://app.joinhodl.com/",
-            "iconUrl": "https://app.joinhodl.com/logos/hodl.png",
-            "splashImageUrl": "https://framerusercontent.com/images/QfooZw9LMnkCZk8oTgAi13Ysuy4.png",
+            "iconUrl": "https://app.joinhodl.com/logos/App_Icon.png",
+            "splashImageUrl": "https://app.joinhodl.com/logos/HODL_Primary_BlockBlue.svg",
             "splashBackgroundColor": "#ffffff",
             "webhookUrl": "https://ex.co/api/webhook",
             "subtitle": "Hodl strong. Spend easy",
             "description": "Keep your assets. Minimize your portfolio.",
             "screenshotUrls": [
+                "https://framerusercontent.com/images/QfooZw9LMnkCZk8oTgAi13Ysuy4.png",
                 "https://app.joinhodl.com/logos/HODL_Primary_BlockBlue.svg",
                 "https://app.joinhodl.com/logos/HODL_Primary_White.svg",
                 "https://app.joinhodl.com/logos/HODL_Primary_ProtocolNavy.svg",
@@ -37,11 +38,11 @@ export async function GET() {
             ],
             "primaryCategory": "DeFi",
             "tags": ["HODL", "lending", "yield", "earn", "borrow", "spend", "miniapp", "baseapp"],
-            "heroImageUrl": "https://framerusercontent.com/images/QfooZw9LMnkCZk8oTgAi13Ysuy4.png",
+            "heroImageUrl": "https://app.joinhodl.com/logos/App_Icon.png",
             "tagline": "Hodl strong. Spend easy",
             "ogTitle": "Just HODL It.",
             "ogDescription": "Keep your assets. Minimize your portfolio.",
-            "ogImageUrl": "https://app.joinhodl.com/logos/hodl.png",
+            "ogImageUrl": "https://app.joinhodl.com/logos/App_Icon.png",
             "noindex": true
         }
     }
