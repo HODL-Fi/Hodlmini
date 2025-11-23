@@ -188,7 +188,7 @@ export async function generateMetadata(): Promise<Metadata> {
     other: {
       'fc:miniapp': JSON.stringify({
         version: 'next',
-        imageUrl: 'https://framerusercontent.com/images/QfooZw9LMnkCZk8oTgAi13Ysuy4.png',
+        imageUrl: 'https://app.joinhodl.com/logos/App_Icon.png',
         button: {
           title: `Just HODL It.`,
           action: {
