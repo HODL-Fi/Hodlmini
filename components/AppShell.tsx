@@ -3,6 +3,8 @@ import React, { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import sdk from "@farcaster/miniapp-sdk";
+import { Web3AuthProvider } from "@web3auth/modal/react";
+import web3AuthContextConfig from "@/contexts/web3authContext";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -19,12 +21,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
 
+  
 
 
   return (
-    <div className={`mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] ${pb}`}>
-      {children}
-      {hideBottomNav ? null : <BottomNav />}
+    <div>
+    <Web3AuthProvider config={web3AuthContextConfig}>
+      <div className={`mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] ${pb}`}>
+        {children}
+        {hideBottomNav ? null : <BottomNav />}
+      </div>
+    </Web3AuthProvider>
     </div>
   );
 }

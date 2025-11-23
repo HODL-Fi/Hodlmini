@@ -2,7 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
-import Link from "next/link";
+import { useWeb3Auth } from "@web3auth/modal/react";
 
 type Slide = {
   key: string;
@@ -44,6 +44,8 @@ export default function OnboardingPage() {
   const scrollerRef = React.useRef<HTMLDivElement | null>(null);
   const autoAdvanceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const isProgrammaticScrollRef = React.useRef(false);
+
+  const { web3Auth } = useWeb3Auth();
 
   // Function to scroll to a specific slide
   const scrollToSlide = React.useCallback((index: number) => {
@@ -165,7 +167,7 @@ export default function OnboardingPage() {
           >
             <div className="h-full mx-auto w-full max-w-[560px] px-6 flex flex-col items-center justify-center text-center py-8">
               <div className="flex flex-col items-center gap-6">
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <Image
                     src={slide.imageSrc}
                     alt={slide.imageAlt}
@@ -177,7 +179,7 @@ export default function OnboardingPage() {
                 </div>
                 
                 <h2
-                  className="font-[family-name:var(--font-clash)] text-[28px] font-semibold leading-[1.15] tracking-tight"
+                  className="font-(family-name:--font-clash) text-[28px] font-semibold leading-[1.15] tracking-tight"
                   aria-live="polite"
                 >
                   {slide.titleLines.map((line, idx) => (
@@ -195,18 +197,18 @@ export default function OnboardingPage() {
       {/* Fixed CTA buttons */}
       <div className="mx-auto w-full max-w-[560px] px-6 pb-8 shrink-0">
         <div className="w-full space-y-3">
-          <Link
-            href="/coming-soon"
+          <button
+            onClick={() => web3Auth?.connect()}
             className="block w-full rounded-[20px] bg-[#2200FF] px-4 py-3 text-[14px] font-medium text-white text-center"
           >
             Create an account
-          </Link>
-          <Link
-            href="/coming-soon"
+          </button>
+          <button
+            onClick={() => web3Auth?.connect()}
             className="block w-full rounded-[20px] bg-gray-100 px-4 py-3 text-[14px] font-medium text-gray-900 text-center"
           >
             Log in
-          </Link>
+          </button>
         </div>
       </div>
     </div>

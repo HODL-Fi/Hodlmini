@@ -17,10 +17,10 @@ export async function GET() {
         },
         "miniapp": {
             "version": "1",
-            "name": "Just HODL It.",
+            "name": "HODL",
             "homeUrl": "https://app.joinhodl.com/",
             "iconUrl": "https://app.joinhodl.com/logos/App_Icon.png",
-            "splashImageUrl": "https://app.joinhodl.com/logos/HODL_Primary_BlockBlue.svg",
+            "splashImageUrl": "https://app.joinhodl.com/logos/App_Icon.png",
             "splashBackgroundColor": "#ffffff",
             "webhookUrl": "https://ex.co/api/webhook",
             "subtitle": "Hodl strong. Spend easy",

@@ -190,12 +190,12 @@ export async function generateMetadata(): Promise<Metadata> {
         version: 'next',
         imageUrl: 'https://app.joinhodl.com/logos/App_Icon.png',
         button: {
-          title: `Just HODL It.`,
+          title: `HODL`,
           action: {
             type: 'launch_miniapp',
             name: 'Just HODL It.',
             url: 'https://app.joinhodl.com/',
-            splashImageUrl: 'https://app.joinhodl.com/logos/HODL_Primary_BlockBlue.svg',
+            splashImageUrl: 'https://app.joinhodl.com/logos/App_Icon.png',
             splashBackgroundColor: '#ffffff',
           },
         },
