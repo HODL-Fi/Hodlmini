@@ -1,1 +1,1 @@
-Deploy a new version of the app to Vercel
+Deploy a new version of the app to Vercel.
