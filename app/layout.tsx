@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { 
-  Geist, 
+import {
+  Geist,
   Geist_Mono,
   Inter,
   Poppins,
@@ -170,19 +170,39 @@ const allFontVariables = [
   sora.variable,
 ].join(" ");
 
-export const metadata: Metadata = {
-  title: "Just HODL It.",
-  description: "Keep your assets. Minimize your portfolio.",
-  manifest: "/site.webmanifest",
-  icons: {
-    icon: [
-      { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
-    ],
-    apple: [
-      { url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" },
-    ],
-  },
-};
+
+
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "Just HODL It.",
+    description: "Keep your assets. Minimize your portfolio.",
+    manifest: "/site.webmanifest",
+    icons: {
+      icon: [
+        { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
+      ],
+      apple: [
+        { url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" },
+      ],
+    },
+    other: {
+      'fc:miniapp': JSON.stringify({
+        version: 'next',
+        imageUrl: 'https://framerusercontent.com/images/QfooZw9LMnkCZk8oTgAi13Ysuy4.png',
+        button: {
+          title: `Just HODL It.`,
+          action: {
+            type: 'launch_miniapp',
+            name: 'Just HODL It.',
+            url: 'https://app.joinhodl.com/',
+            splashImageUrl: 'https://app.joinhodl.com/logos/HODL_Primary_BlockBlue.svg',
+            splashBackgroundColor: '#ffffff',
+          },
+        },
+      }),
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
