@@ -17,7 +17,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const inTx = pathname?.startsWith("/home/transactions");
   const inWalletSub = pathname?.startsWith("/wallet/") && pathname !== "/wallet";
   const inOnboarding = pathname?.startsWith("/onboarding");
-  const hideBottomNav = Boolean(inTx || inWalletSub || inOnboarding);
+  const inAuth = pathname?.startsWith("/auth");
+  const inPublicTerms = pathname?.startsWith("/terms");
+  const hideBottomNav = Boolean(inTx || inWalletSub || inOnboarding || inAuth || inPublicTerms);
   const pb = hideBottomNav
     ? "pb-[calc(max(env(safe-area-inset-bottom,0px),16px)+0px)]"
     : "pb-[calc(max(env(safe-area-inset-bottom,0px),16px)+64px)]";

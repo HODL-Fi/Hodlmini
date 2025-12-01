@@ -3,10 +3,7 @@
 
 import React from "react";
 import Image from "next/image";
-import { useWeb3Auth } from "@web3auth/modal/react";
-import { useSignInAPI } from "@/hooks/auth/useSignInAPI";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { GoogleLogin, googleLogout, useGoogleLogin } from "@react-oauth/google";
+import { useRouter } from "next/navigation";
 
 type Slide = {
   key: string;
@@ -49,15 +46,15 @@ export default function OnboardingPage() {
   const autoAdvanceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const isProgrammaticScrollRef = React.useRef(false);
 
-  const { web3Auth } = useWeb3Auth();
+  const router = useRouter();
 
-  const { mutateAsync: loginUser } = useSignInAPI();
+  const goToSignup = () => {
+    router.push("/auth?mode=signup");
+  };
 
-
-
-  const handleLogin = () => {
-    alert("Login functionality to be implemented.");
-  }
+  const goToSignin = () => {
+    router.push("/auth?mode=signin");
+  };
 
 
   // Function to scroll to a specific slide
@@ -212,22 +209,14 @@ export default function OnboardingPage() {
         <div className="w-full space-y-3">
 
 
-          <GoogleLogin
-            onSuccess={credentialResponse => {
-              console.log("credentialResponse", credentialResponse);
-            }}
-            onError={() => {
-              console.log('Login Failed');
-            }}
-          />;
           <button
-            onClick={handleLogin}
+            onClick={goToSignup}
             className="block w-full rounded-[20px] bg-[#2200FF] px-4 py-3 text-[14px] font-medium text-white text-center"
           >
             Create an account
           </button>
           <button
-            onClick={handleLogin}
+            onClick={goToSignin}
             className="block w-full rounded-[20px] bg-gray-100 px-4 py-3 text-[14px] font-medium text-gray-900 text-center"
           >
             Log in
