@@ -1,8 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React from "react";
 import Image from "next/image";
 import { useWeb3Auth } from "@web3auth/modal/react";
+import { useSignInAPI } from "@/hooks/auth/useSignInAPI";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { GoogleLogin, googleLogout, useGoogleLogin } from "@react-oauth/google";
 
 type Slide = {
   key: string;
@@ -47,6 +51,15 @@ export default function OnboardingPage() {
 
   const { web3Auth } = useWeb3Auth();
 
+  const { mutateAsync: loginUser } = useSignInAPI();
+
+
+
+  const handleLogin = () => {
+    alert("Login functionality to be implemented.");
+  }
+
+
   // Function to scroll to a specific slide
   const scrollToSlide = React.useCallback((index: number) => {
     const node = scrollerRef.current;
@@ -89,7 +102,7 @@ export default function OnboardingPage() {
   React.useEffect(() => {
     const node = scrollerRef.current;
     if (!node) return;
-    
+
     const onScroll = () => {
       const x = node.scrollLeft;
       const w = node.clientWidth;
@@ -106,7 +119,7 @@ export default function OnboardingPage() {
         }, 100);
       }
     };
-    
+
     node.addEventListener("scroll", onScroll, { passive: true });
     return () => node.removeEventListener("scroll", onScroll);
   }, [activeIndex]);
@@ -177,7 +190,7 @@ export default function OnboardingPage() {
                     className="w-full h-auto"
                   />
                 </div>
-                
+
                 <h2
                   className="font-(family-name:--font-clash) text-[28px] font-semibold leading-[1.15] tracking-tight"
                   aria-live="polite"
@@ -197,14 +210,24 @@ export default function OnboardingPage() {
       {/* Fixed CTA buttons */}
       <div className="mx-auto w-full max-w-[560px] px-6 pb-8 shrink-0">
         <div className="w-full space-y-3">
+
+
+          <GoogleLogin
+            onSuccess={credentialResponse => {
+              console.log("credentialResponse", credentialResponse);
+            }}
+            onError={() => {
+              console.log('Login Failed');
+            }}
+          />;
           <button
-            onClick={() => web3Auth?.connect()}
+            onClick={handleLogin}
             className="block w-full rounded-[20px] bg-[#2200FF] px-4 py-3 text-[14px] font-medium text-white text-center"
           >
             Create an account
           </button>
           <button
-            onClick={() => web3Auth?.connect()}
+            onClick={handleLogin}
             className="block w-full rounded-[20px] bg-gray-100 px-4 py-3 text-[14px] font-medium text-gray-900 text-center"
           >
             Log in

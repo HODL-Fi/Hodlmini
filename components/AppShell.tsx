@@ -5,6 +5,12 @@ import BottomNav from "@/components/BottomNav";
 import sdk from "@farcaster/miniapp-sdk";
 import { Web3AuthProvider } from "@web3auth/modal/react";
 import web3AuthContextConfig from "@/contexts/web3authContext";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+
+
+const queryClient = new QueryClient();
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -21,17 +27,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
 
-  
+
 
 
   return (
     <div>
-    <Web3AuthProvider config={web3AuthContextConfig}>
-      <div className={`mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] ${pb}`}>
-        {children}
-        {hideBottomNav ? null : <BottomNav />}
-      </div>
-    </Web3AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
+          <Web3AuthProvider config={web3AuthContextConfig}>
+            <div className={`mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] ${pb}`}>
+              {children}
+              {hideBottomNav ? null : <BottomNav />}
+            </div>
+          </Web3AuthProvider>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </GoogleOAuthProvider>
+      </QueryClientProvider>
     </div>
   );
 }
