@@ -23,6 +23,10 @@ function AuthPageInner() {
   const [requirementModalOpen, setRequirementModalOpen] = React.useState(false);
   const [modalVariant, setModalVariant] = React.useState<"requirements" | "email" | "info">("requirements");
   const [modalText, setModalText] = React.useState("");
+  const [otpModalOpen, setOtpModalOpen] = React.useState(false);
+  const [otpEmail, setOtpEmail] = React.useState("");
+  const [otpCode, setOtpCode] = React.useState("");
+  const otpRefs = React.useRef<Array<HTMLInputElement | null>>([]);
 
   const hasCountry = Boolean(country);
   const hasAccepted = acceptedTerms;
@@ -193,9 +197,9 @@ function AuthPageInner() {
                       setRequirementModalOpen(true);
                       return;
                     }
-                    setModalVariant("info");
-                    setModalText(`Sign-up with email: ${signupEmail} (to be implemented).`);
-                    setRequirementModalOpen(true);
+                    setOtpEmail(signupEmail);
+                    setOtpCode("");
+                    setOtpModalOpen(true);
                   } else {
                     if (!isValidSigninEmail) {
                       setModalVariant("email");
@@ -203,9 +207,9 @@ function AuthPageInner() {
                       setRequirementModalOpen(true);
                       return;
                     }
-                    setModalVariant("info");
-                    setModalText("Email sign-in flow to be implemented.");
-                    setRequirementModalOpen(true);
+                    setOtpEmail(signinEmail);
+                    setOtpCode("");
+                    setOtpModalOpen(true);
                   }
                 }}
                 disabled={!isSignup ? !isValidSigninEmail : false}
@@ -321,6 +325,116 @@ function AuthPageInner() {
               onClick={() => setRequirementModalOpen(false)}
             >
               Got it
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* OTP modal */}
+      <Modal open={otpModalOpen} onClose={() => setOtpModalOpen(false)}>
+        <div className="space-y-5">
+          <div className="flex items-start justify-between">
+            <div className="text-[18px] font-semibold">Verify your email</div>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setOtpModalOpen(false)}
+              className="rounded-full p-2 text-gray-600 hover:bg-gray-100 cursor-pointer"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex flex-col items-center text-center">
+            <p className="max-w-[420px] text-[14px] leading-6 text-gray-600">
+              Enter the 6‑digit code sent to <span className="font-medium text-gray-900">{otpEmail}</span>.
+            </p>
+            <div className="mt-3 w-full max-w-[360px]">
+              <div className="flex items-center justify-between gap-2">
+                {Array.from({ length: 6 }).map((_, i) => {
+                  const val = otpCode[i] ?? "";
+                  return (
+                    <input
+                      key={i}
+                      ref={(el) => { otpRefs.current[i] = el; }}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={val}
+                      onChange={(e) => {
+                        const d = e.target.value.replace(/\D/g, "").slice(0, 1);
+                        const before = otpCode.slice(0, i);
+                        const after = otpCode.slice(i + 1);
+                        const next = (before + d + after).padEnd(6, "").slice(0, 6);
+                        setOtpCode(next);
+                        if (d && i < 5) {
+                          otpRefs.current[i + 1]?.focus();
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        const isBackspace = e.key === "Backspace";
+                        const isArrowLeft = e.key === "ArrowLeft";
+                        const isArrowRight = e.key === "ArrowRight";
+                        if (isArrowLeft && i > 0) {
+                          e.preventDefault();
+                          otpRefs.current[i - 1]?.focus();
+                        } else if (isArrowRight && i < 5) {
+                          e.preventDefault();
+                          otpRefs.current[i + 1]?.focus();
+                        } else if (isBackspace) {
+                          if (otpCode[i]) {
+                            const before = otpCode.slice(0, i);
+                            const after = otpCode.slice(i + 1);
+                            const next = (before + "" + after).padEnd(6, "").slice(0, 6);
+                            setOtpCode(next);
+                          } else if (i > 0) {
+                            otpRefs.current[i - 1]?.focus();
+                            const j = i - 1;
+                            const before = otpCode.slice(0, j);
+                            const after = otpCode.slice(j + 1);
+                            const next = (before + "" + after).padEnd(6, "").slice(0, 6);
+                            setOtpCode(next);
+                            e.preventDefault();
+                          }
+                        }
+                      }}
+                      onPaste={(e) => {
+                        const text = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, 6);
+                        if (text.length) {
+                          e.preventDefault();
+                          setOtpCode(text.padEnd(6, "").slice(0, 6));
+                          const targetIndex = Math.min(text.length, 5);
+                          otpRefs.current[targetIndex]?.focus();
+                        }
+                      }}
+                      className="w-12 h-12 text-center rounded-[10px] border border-gray-200 text-[18px] outline-none focus:ring-2 focus:ring-[#2200FF]/20 focus:border-[#2200FF]"
+                    />
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-[12px] text-gray-600">
+                Didn&apos;t get a code? <button type="button" className="text-[#2200FF] underline">Resend</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-1 flex items-center gap-2">
+            <button
+              type="button"
+              disabled={otpCode.length !== 6}
+              className={`w-full rounded-[14px] px-4 py-3 text-[14px] font-medium text-white cursor-pointer ${otpCode.length === 6 ? "bg-[#2200FF]" : "bg-[#2200FF]/70 cursor-not-allowed"}`}
+              onClick={() => {
+                // Placeholder verification success
+                setOtpModalOpen(false);
+                setModalVariant("info");
+                setModalText("OTP verified. Continue flow integration here.");
+                setRequirementModalOpen(true);
+              }}
+            >
+              Verify
             </button>
           </div>
         </div>
