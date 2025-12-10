@@ -12,6 +12,9 @@ import { VisibilityProvider } from "@/components/visibility";
 import BorrowTopNav from "@/components/BorrowTopNav";
 import { QuickActions } from "@/components/quickActions";
 import BalanceRow from "@/components/BalanceRow";
+import useGetHealthFactor from "@/hooks/vault/useGetHealthFactor";
+import useGetCollateralPosition from "@/hooks/vault/useGetCollateralPosition";
+import useGetAccountValue from "@/hooks/vault/useGetAccountValue";
 
 type Position = { symbol: string; amount: number };
 
@@ -81,6 +84,10 @@ function VaultPageInner() {
   function formatNumber(n: number, d = 2) {
     return new Intl.NumberFormat("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
   }
+
+  const healthFactor = useGetHealthFactor();
+  const collateralPosition = useGetCollateralPosition();
+  const accountValue = useGetAccountValue();
 
   return (
     <div className="min-h-dvh">

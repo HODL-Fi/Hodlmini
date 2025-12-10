@@ -3,14 +3,15 @@ import { postFetch } from "@/utils/api/fetch";
 
 export type LoginUserRequest = {
   idToken: string;
+  country?: string;
+  referralCode?: string;
 };
 
 export type LoginUserResponse = {
-    status: string;
-    message: string;
-    data: {
-      token: string;
-    };
+  accessToken: string;
+  refreshToken: string;
+  userId: string;
+  evmAddress: string; 
 };
 
 
@@ -19,7 +20,7 @@ const loginUserFn = async (payload: LoginUserRequest): Promise<LoginUserResponse
   return res.data;
 };
 
-export const useSignInAPI = () => {
+export const useGoogleSignInAPI = () => {
   return useMutation<LoginUserResponse, Error, LoginUserRequest>({
     mutationFn: loginUserFn,
   });

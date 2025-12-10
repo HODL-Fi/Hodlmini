@@ -1,5 +1,6 @@
 import axios from "axios";
 import { envVars } from "../config/envVars";
+import { clearAuth } from "../helpers/clearAuth";
 
 const getBaseURL = () => envVars.api;
 
@@ -21,46 +22,52 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {
-      
+    const token = localStorage.getItem("accessToken");
 
-      let storedToken: string | null = null;
-      storedToken = localStorage.getItem("accessToken");
-
-      let accessToken: string | null = null;
-      let tokenType: string = "Bearer";
-
-      if (storedToken) {
-        try {
-          const parsed = JSON.parse(storedToken);
-          accessToken = parsed?.access_token ?? null;
-          tokenType = parsed?.token_type ?? "Bearer";
-        } catch {
-          accessToken = storedToken;
-          tokenType = "Bearer";
-        }
-      }
-
-      if (accessToken) {
-        config.headers.Authorization = `${tokenType} ${accessToken}`;
-      }
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    return config;
+  }    return config;
   },
   (error) => Promise.reject(error)
 );
 
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (typeof window !== "undefined") {
-      const isLoggingOut = sessionStorage.getItem("isLoggingOut") === "true";
-      if (error.response?.status === 401 && !isLoggingOut) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("userData");
+  async (error) => {
+    if (typeof window === "undefined") {
+      return Promise.reject(error);
+    }
 
-        // window.location.href = "/auth/signin"; 
+    // Only handle 401 responses
+    if (error.response?.status === 401) {
+      const refreshToken = localStorage.getItem("refreshToken");
+
+      // If no refresh token → logout & redirect
+      if (!refreshToken) {
+        clearAuth();
+        return Promise.reject(error);
+      }
+
+      try {
+        // 🔄 Attempt refresh
+        const res = await apiInstance.post("/auth/refresh", { refreshToken });
+
+        // Save new token
+        localStorage.setItem("accessToken", res.data.accessToken);
+
+        // Retry original request with new token
+        error.config.headers.Authorization = `Bearer ${res.data.accessToken}`;
+        return axiosInstance(error.config);
+
+      } catch (refreshError) {
+        // ❌ Refresh failed → force logout
+        clearAuth();
+        return Promise.reject(refreshError);
       }
     }
+
+    // Not a 401 → pass through
     return Promise.reject(error);
   }
 );

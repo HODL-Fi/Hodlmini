@@ -1,13 +1,19 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { useGoogleLogin } from "@react-oauth/google";
+import { CredentialResponse, GoogleLogin, useGoogleLogin } from "@react-oauth/google";
 import AuthTagCollage from "@/components/AuthTagCollage";
 import CountrySelect from "@/components/CountrySelect";
 import Modal from "@/components/ui/Modal";
+import { useGoogleSignInAPI } from "@/hooks/auth/useGoogleSignInAPI";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { useWeb3Auth } from "@web3auth/modal/react";
+import { AUTH_CONNECTION, WALLET_CONNECTORS } from "@web3auth/modal";
+import axios from "axios";
 
 type AuthMode = "signup" | "signin";
 type CountryCode = string; // ISO 3166-1 alpha-2 code
@@ -31,15 +37,105 @@ function AuthPageInner() {
   const hasCountry = Boolean(country);
   const hasAccepted = acceptedTerms;
 
+  const { web3Auth } = useWeb3Auth();
+  const { mutateAsync: loginUser } = useGoogleSignInAPI();
+  
+
+
+  const handleGoogleLogin = async (googleResponse: any) => {
+  try {
+    // const idToken = googleResponse; // <-- REAL GOOGLE JWT
+
+    // Authenticate inside Web3Auth WITHOUT modal
+    await web3Auth?.connectTo(WALLET_CONNECTORS.AUTH, {
+      authConnectionId: "hodl-test-pha",   // YOUR Google connection ID
+      authConnection: AUTH_CONNECTION.GOOGLE,
+      idToken : googleResponse,
+      extraLoginOptions: {
+        isUserIdCaseSensitive: false,
+      },
+    });
+
+    // Now Web3Auth is authenticated invisibly
+    const identity = await web3Auth?.getIdentityToken();
+    const jwt = identity?.idToken;
+
+    const userInfo = await web3Auth?.getUserInfo();
+    console.log("W3A User:", userInfo);
+
+    // 🔥 send Google token to your backend
+    // const res = await loginUser({ idToken });
+    // console.log("Backend Login:", res);
+
+  } catch (err) {
+    console.error("Custom Google login failed", err);
+  }
+  };
+  
+
+  
+const login = useGoogleLogin({
+  onSuccess: async (tokenResponse) => {
+    // You have the Access Token!
+    // Now use it to ask Google for the User Info
+    const userInfo = await axios.get(
+      'https://www.googleapis.com/oauth2/v3/userinfo',
+      { headers: { Authorization: `Bearer ${tokenResponse.access_token}` } }
+    );
+
+    console.log(userInfo.data);
+    // Output: { name: "Omorotimi...", email: "okste1234@...", picture: "..." }
+  },
+});
+
   const googleLogin = useGoogleLogin({
-    flow: "implicit",
-    onSuccess: (tokenResponse) => {
-      console.log("google tokenResponse", tokenResponse);
-    },
-    onError: () => {
-      console.log("Login Failed");
-    },
+  flow: "implicit",
+  onSuccess: async (tokenResponse) => {
+    console.log("google tokenResponse", tokenResponse);
+
+    // tokenResponse.access_token is NOT useful for Web3Auth
+    // We need the ID TOKEN (Google JWT)
+    const userInfo = await fetch(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+      }
+    ).then((res) => res.json());
+
+    const idToken = userInfo?.id_token;
+
+    console.log("idToken", idToken)
+
+    if (!idToken) {
+      console.error("No ID Token returned by Google");
+      return;
+    }
+
+    // handleGoogleLogin({ credential: idToken });
+  },
+  onError: () => {
+    console.log("Login Failed");
+  },
   });
+  
+
+  const checkRequirements = () => {
+    if (isSignup && (!country || !acceptedTerms)) {
+      setRequirementModalOpen(true);
+      return false; // Requirements failed
+    }
+    return true; // Requirements passed
+  };
+
+  const handleGoogleSuccess = (credentialResponse : any) => {
+    // This runs AFTER the successful Google login and popup closes
+    const idToken = credentialResponse.credential; // ← THIS IS THE GOOGLE ID TOKEN
+    console.log("ID TOKEN:", idToken);
+    
+    // send to backend / Web3auth / whatever
+   handleGoogleLogin(idToken);
+  };
+
 
   const isSignup = mode === "signup";
   const title = isSignup ? "Create your account" : "Welcome back";
@@ -96,9 +192,23 @@ function AuthPageInner() {
               {title}
             </h1>
 
+            {/* <GoogleLogin
+  onSuccess={(credentialResponse) => {
+    const idToken = credentialResponse; // ← THIS IS THE GOOGLE ID TOKEN
+    console.log("ID TOKEN:", idToken);
+
+    // send to backend / Web3auth / whatever
+    // handleGoogleLogin(idToken);
+  }}
+  onError={() => {
+    console.log("Login Failed");
+  }}
+              
+/> */}
+
             <div className="w-full max-w-[360px] space-y-3">
               {/* Google Sign-In */}
-              <button
+              {/* <button
                 type="button"
                 onClick={() => {
                   if (isSignup && (!country || !acceptedTerms)) {
@@ -111,7 +221,56 @@ function AuthPageInner() {
               >
                 <Image src="/socials/google.svg" alt="Google" width={20} height={20} className="h-5 w-5" />
                 <span>{isSignup ? "Sign up with Google" : "Sign in with Google"}</span>
-              </button>
+              </button> */}
+
+              <div className="w-full  space-y-3" style={{ position: 'relative' }}>
+      
+      {/* 1. The Custom Button (Visual Element) */}
+      {/* This is the visual background. We attach the conditional logic here.
+        If the logic fails, we show the modal and prevent the click from activating 
+        the Google login flow (by returning false in the onClick handler).
+      */}
+      <button
+        type="button"
+        // Run conditional logic. If it fails, open the modal and stop here.
+        onClick={() => {
+          if (!checkRequirements()) {
+            return;
+          }
+          // If requirements pass, the click continues and hits the invisible button underneath.
+        }}
+        className="w-full rounded-[20px] bg-gray-100 px-4 py-3 text-[14px] font-medium text-gray-900 text-center flex items-center justify-center gap-2"
+      >
+        {/* Placeholder for your Image component */}
+        {/* <Image src="/socials/google.svg" alt="Google" width={20} height={20} className="h-5 w-5" /> */}
+        <img src="/socials/google.svg" alt="Google" className="h-5 w-5" />
+        <span>{isSignup ? "Sign up with Google" : "Sign in with Google"}</span>
+      </button>
+
+        {/* 2. The Hidden Google Login (Clickable Element) */}
+        <div 
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            opacity: 0.01, // Must be > 0 for browser click to register reliably
+            zIndex: 10,  // Ensures it sits on top of the custom button
+            overflow: 'hidden',
+            cursor: 'pointer',
+          }}
+        >
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => {
+              console.log("Login Failed");
+            }}
+            // Note: The GoogleLogin component is slightly transparent but is the element 
+            // that receives the actual user click event to trigger the popup.
+          />
+        </div>
+      </div>
 
               {/* OR divider */}
               <div className="flex items-center gap-2 my-1">
@@ -252,6 +411,8 @@ function AuthPageInner() {
           </div>
         </div>
       </div>
+
+      
 
       {/* Modal for unmet signup requirements */}
       <Modal open={requirementModalOpen} onClose={() => setRequirementModalOpen(false)}>

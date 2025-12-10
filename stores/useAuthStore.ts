@@ -1,16 +1,9 @@
-// stores/useAuthStore.ts
 import { create } from "zustand";
 
-export interface AuthUser {
-  email: string;
-  name: string;
-  profileImage: string;
-  authConnection: string;
-  userId: string;
-}
-
 interface AuthState {
-  user: AuthUser | null;
+  userId: string | null;
+  evmAddress: string | null;
+  country: string | null;
   idToken: string | null;
 
   loading: boolean;
@@ -18,12 +11,21 @@ interface AuthState {
 
   setLoading: (v: boolean) => void;
   setError: (v: string | null) => void;
-  setAuth: (user: AuthUser, idToken: string) => void;
+
+  setAuth: (data: {
+    userId: string;
+    evmAddress: string;
+    country?: string;
+    idToken?: string;
+  }) => void;
+
   clear: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
+  userId: null,
+  evmAddress: null,
+  country: null,
   idToken: null,
 
   loading: false,
@@ -31,6 +33,24 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setLoading: (v) => set({ loading: v }),
   setError: (v) => set({ error: v }),
-  setAuth: (user, idToken) => set({ user, idToken, loading: false, error: null }),
-  clear: () => set({ user: null, idToken: null, loading: false, error: null }),
+
+  setAuth: ({ userId, evmAddress, country, idToken }) =>
+    set({
+      userId,
+      evmAddress,
+      country: country ?? null,
+      idToken: idToken ?? null,
+      loading: false,
+      error: null,
+    }),
+
+  clear: () =>
+    set({
+      userId: null,
+      evmAddress: null,
+      country: null,
+      idToken: null,
+      loading: false,
+      error: null,
+    }),
 }));

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React from "react";
@@ -10,6 +11,8 @@ import { QuickActions } from "@/components/quickActions";
 import { WalletIcon, VaultIcon } from "@customIcons";
 import Image from "next/image";
 import Modal from "@/components/ui/Modal";
+import { CHAIN_IDS } from "@/utils/constants/chainIds";
+import useGetTokenWalletBalance, { TokenBalance, useGetAllChainBalances } from "@/hooks/wallet/useGetTokenWalletBalance";
 
 export default function WalletPage() {
   // Supported chains and assets
@@ -32,6 +35,8 @@ export default function WalletPage() {
     changePct: number; // 24h %
   };
 
+  
+
   const ASSETS: AssetItem[] = React.useMemo(() => ([
     { symbol: "ETH",  name: "Ethereum",  icon: "/assets/eth.svg",  supported: ["ETH","BSC","LSK","BASE"], balances: { ETH: 1.12 },  price: 3115.25, changePct: 1.12 },
     { symbol: "USDT", name: "Tether",    icon: "/assets/usdt.svg", supported: ["ETH","BSC","LSK","BASE"], balances: { ETH: 1109, BSC: 1000 },   price: 1.00,     changePct: -0.29 },
@@ -45,6 +50,36 @@ export default function WalletPage() {
 
   const [selectedChain, setSelectedChain] = React.useState<ChainKey>("ALL");
   const [networkModalOpen, setNetworkModalOpen] = React.useState(false);
+
+  // When selectedChain !== "ALL" you simply call:
+  const chainId = selectedChain === "ALL" ? undefined : CHAIN_IDS[selectedChain];
+  const { data: chainData } = useGetTokenWalletBalance(chainId!);
+
+
+  const chainList = Object.values(CHAIN_IDS);
+  const balances = useGetAllChainBalances(chainList);
+
+  const allBalances = React.useMemo(() => {
+  const merged: Record<string, TokenBalance & { total: number }> = {};
+
+  balances.forEach((q) => {
+    if (!q.data) return;
+
+    q.data.forEach((t) => {
+      const amount = Number(t.balance);
+
+      if (!merged[t.symbol]) {
+        merged[t.symbol] = { ...t, total: amount };
+      } else {
+        merged[t.symbol].total += amount;
+      }
+    });
+  });
+
+  return Object.values(merged);
+}, [balances]);
+
+
 
   const filteredAssets = React.useMemo(() => {
     // Build display rows with aggregated or per-network balances
