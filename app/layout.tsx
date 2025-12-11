@@ -175,7 +175,7 @@ const allFontVariables = [
 export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Just HODL It.",
-    description: "Keep your assets. Minimize your portfolio.",
+    description: "Keep your assets. Maximize your portfolio.",
     manifest: "/site.webmanifest",
     icons: {
       icon: [

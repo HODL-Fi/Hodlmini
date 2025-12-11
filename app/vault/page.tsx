@@ -90,11 +90,12 @@ function VaultPageInner() {
   const collateralPosition = useGetCollateralPosition();
   const accountValue = useGetAccountValue();
 
-  // const { evmAddress } = useAuthStore.getState();
-  
-  // console.log("evmAddress ", evmAddress);
-  
-  
+  // Extract API values with fallback to null
+  const apiCollateral = accountValue.data?.collateralValue ? Number(accountValue.data.collateralValue) : null;
+  const apiAvailable = accountValue.data?.availableToBorrow ? Number(accountValue.data.availableToBorrow) : null;
+  const apiDebt = accountValue.data?.debtValue ? Number(accountValue.data.debtValue) : null;
+  const apiHealthFactor = healthFactor.data?.healthFactor ? Number(healthFactor.data.healthFactor) : null;
+
   return (
     <div className="min-h-dvh">
       <main className="px-3 text-left">
@@ -113,7 +114,14 @@ function VaultPageInner() {
 
       {/* Total collateral balance */}
       <section className="mt-4">
-        <BalanceRow label="Total Collateral" amount={`$${formatNumber(totals.totalValueUSD)}`} />
+        <BalanceRow
+          label="Total Collateral"
+          amount={
+            apiCollateral !== null
+              ? `$${formatNumber(apiCollateral)}`
+              : `$${formatNumber(totals.totalValueUSD)}`
+          }
+        />
       </section>
 
       {/* Quick actions: Deposit / Withdraw */}
@@ -136,16 +144,25 @@ function VaultPageInner() {
         <section className="mt-3 rounded-[16px] border border-gray-200 bg-white p-4">
           <div className="flex items-center justify-between text-[14px]">
             <div className="text-gray-600">Health Factor</div>
-            <div className="font-semibold">{Number.isFinite(totals.hf) ? totals.hf.toFixed(2) : "—"}</div>
+            <div className="font-semibold">
+              {apiHealthFactor !== null 
+                ? (Number.isFinite(apiHealthFactor) ? apiHealthFactor.toFixed(2) : "—")
+                : (Number.isFinite(totals.hf) ? totals.hf.toFixed(2) : "—")
+              }
+            </div>
           </div>
           <div className="mt-2">
             <HealthBar percentage={totals.riskPct} />
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
             <div className="text-gray-600">Borrow limit remaining</div>
-            <div className="text-right font-semibold">${formatNumber(totals.borrowRemainUSD)}</div>
+            <div className="text-right font-semibold">
+              {apiAvailable !== null ? `$${formatNumber(apiAvailable)}` : `$${formatNumber(totals.borrowRemainUSD)}`}
+            </div>
             <div className="text-gray-600">Current debt</div>
-            <div className="text-right font-semibold">${formatNumber(debtUsd)}</div>
+            <div className="text-right font-semibold">
+              {apiDebt !== null ? `$${formatNumber(apiDebt)}` : `$${formatNumber(debtUsd)}`}
+            </div>
           </div>
         </section>
 

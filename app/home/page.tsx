@@ -1,6 +1,8 @@
 "use client";
 
 import HomeTopNav from "@/components/HomeTopNav";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { generateHandleFromUserId } from "@/utils/username";
 import { AccountsScroller } from "@/components/accounts";
 import GlobalAccountsScroller from "@/components/accounts/GlobalAccountsScroller";
 import { WalletIcon } from "@customIcons";
@@ -15,12 +17,15 @@ import AddFundsModal from "@/components/home/AddFundsModal";
 
 export default function HomePage() {
   const [addOpen, setAddOpen] = React.useState(false);
+	const userId = useAuthStore((s) => s.userId);
+	const country = useAuthStore((s) => s.country);
+	const displayName = userId ? generateHandleFromUserId(userId, "shortHex") : "there";
   return (
     <div className="min-h-dvh">
       <main className="px-3 text-left">
         <VisibilityProvider>
         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-          <HomeTopNav name="Jasper" />
+					<HomeTopNav name={displayName} />
         </div>
 
         <section className="mt-4">
