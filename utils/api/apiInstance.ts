@@ -46,6 +46,7 @@ axiosInstance.interceptors.response.use(
       // If no refresh token → logout & redirect
       if (!refreshToken) {
         clearAuth();
+        window.location.href = "/onboarding";
         return Promise.reject(error);
       }
 
@@ -63,6 +64,7 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         // ❌ Refresh failed → force logout
         clearAuth();
+        window.location.href = "/onboarding";
         return Promise.reject(refreshError);
       }
     }

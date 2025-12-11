@@ -15,6 +15,7 @@ import BalanceRow from "@/components/BalanceRow";
 import useGetHealthFactor from "@/hooks/vault/useGetHealthFactor";
 import useGetCollateralPosition from "@/hooks/vault/useGetCollateralPosition";
 import useGetAccountValue from "@/hooks/vault/useGetAccountValue";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 type Position = { symbol: string; amount: number };
 
@@ -89,6 +90,11 @@ function VaultPageInner() {
   const collateralPosition = useGetCollateralPosition();
   const accountValue = useGetAccountValue();
 
+  // const { evmAddress } = useAuthStore.getState();
+  
+  // console.log("evmAddress ", evmAddress);
+  
+  
   return (
     <div className="min-h-dvh">
       <main className="px-3 text-left">
