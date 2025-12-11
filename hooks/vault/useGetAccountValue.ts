@@ -18,7 +18,7 @@ const useGetAccountValue = () => {
     staleTime: Infinity,      
     refetchOnWindowFocus: false,
       refetchOnReconnect: false,
-    retry: false
+    // retry: false
   });
 };
 

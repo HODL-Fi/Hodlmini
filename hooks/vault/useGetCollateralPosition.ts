@@ -22,7 +22,7 @@ const useGetCollateralPosition = () => {
     staleTime: Infinity,      
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    retry: false,
+    // retry: false,
   });
 };
 

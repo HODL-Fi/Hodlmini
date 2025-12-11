@@ -33,7 +33,8 @@ export const useGetAllChainBalances = (chainIds: Array<number | string>) => {
     queries: chainIds.map((id) => ({
       queryKey: ["wallet_balance", id],
       queryFn: () => getFetch2<TokenBalance[]>(`/users/balances/${id}`),
-      staleTime: Infinity,
+        staleTime: Infinity,
+      
     })),
   });
 
