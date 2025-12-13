@@ -3,7 +3,7 @@
 export const Base = "0x14a34"; // 84532
 export const Ethereum = "0xaa36a7"; // 11155111
 export const BNB_Smart_Chain = "0x61"; // 97
-export const Lisk = "0x106a"; // 4202
+// export const Lisk = "0x106a"; // 4202
 
 
 // MAINNETS
@@ -16,6 +16,6 @@ export const Lisk = "0x106a"; // 4202
 export const CHAIN_IDS = {
   ETH: Ethereum,
   BSC: BNB_Smart_Chain,
-  LSK: Lisk,
+  // LSK: Lisk,
   BASE: Base,
 };

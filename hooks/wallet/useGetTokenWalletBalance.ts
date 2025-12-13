@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getFetch2 } from "@/utils/api/fetch";
-import { useQueries } from "@tanstack/react-query";
+import { getFetch2, postFetch } from "@/utils/api/fetch";
 
 
 export interface TokenBalance {
@@ -29,14 +28,18 @@ const useGetTokenWalletBalance = (chainId: number | string) => {
 export default useGetTokenWalletBalance;
 
 export const useGetAllChainBalances = (chainIds: Array<number | string>) => {
-  const results = useQueries({
-    queries: chainIds.map((id) => ({
-      queryKey: ["wallet_balance", id],
-      queryFn: () => getFetch2<TokenBalance[]>(`/users/balances/${id}`),
-        staleTime: Infinity,
-      
-    })),
+  return useQuery<Record<string, TokenBalance[]>, Error>({
+    queryKey: ["wallet_balance", "all", ...chainIds.sort()],
+    queryFn: async () => {
+      const response = await postFetch<Record<string, TokenBalance[]>, { chainIds: string[] }>(
+        "/users/balances",
+        { chainIds: chainIds.map(String) }
+      );
+      return response.data;
+    },
+    enabled: chainIds.length > 0,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
-
-  return results;
 };

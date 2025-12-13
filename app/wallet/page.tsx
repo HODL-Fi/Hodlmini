@@ -35,63 +35,145 @@ export default function WalletPage() {
     changePct: number; // 24h %
   };
 
+  // Available local icons
+  const LOCAL_ICONS = ['eth', 'usdt', 'usdc', 'dai', 'weth', 'bnb', 'wkc', 'cngn'];
+  
+  // Helper to get icon - prefer local, fallback to API logo
+  const getAssetIcon = (symbol: string, apiLogo: string | null): string => {
+    const symbolLower = symbol.toLowerCase();
+    if (LOCAL_ICONS.includes(symbolLower)) {
+      return `/assets/${symbolLower}.svg`;
+    }
+    return apiLogo || `/assets/${symbolLower}.svg`;
+  };
+
   
 
   const ASSETS: AssetItem[] = React.useMemo(() => ([
-    { symbol: "ETH",  name: "Ethereum",  icon: "/assets/eth.svg",  supported: ["ETH","BSC","LSK","BASE"], balances: { ETH: 1.12 },  price: 3115.25, changePct: 1.12 },
-    { symbol: "USDT", name: "Tether",    icon: "/assets/usdt.svg", supported: ["ETH","BSC","LSK","BASE"], balances: { ETH: 1109, BSC: 1000 },   price: 1.00,     changePct: -0.29 },
-    { symbol: "USDC", name: "USD Coin",  icon: "/assets/usdc.svg", supported: ["ETH","BSC","LSK","BASE"], balances: { ETH: 119.87 }, price: 1.00,     changePct: 1.12 },
-    { symbol: "DAI",  name: "DAI",       icon: "/assets/dai.svg",  supported: ["ETH","BSC","LSK","BASE"], balances: { },      price: 1.00,     changePct: 0.05 },
-    { symbol: "WETH", name: "Wrapped ETH", icon: "/assets/weth.svg", supported: ["ETH","BSC","LSK","BASE"], balances: { },   price: 3115.25, changePct: 1.10 },
-    { symbol: "BNB",  name: "BNB",       icon: "/assets/bnb.svg",  supported: ["ETH","BSC","LSK","BASE"], balances: { },      price: 600.00,  changePct: 0.84 },
-    { symbol: "WKC",  name: "Wikicat",   icon: "/assets/wkc.svg",  supported: ["BSC"],                         balances: { BSC: 0 },      price: 0.000001, changePct: -3.2 },
-    { symbol: "cNGN", name: "compliant NGN", icon: "/assets/cngn.svg", supported: ["BASE","ETH","BSC"], balances: { BASE: 0 }, price: 1/1500, changePct: 0.0 },
+    { symbol: "ETH",  name: "Ethereum",  icon: "/assets/eth.svg",  supported: ["ETH","BSC","LSK","BASE"], balances: { },  price: 0, changePct: 0 },
+    { symbol: "USDT", name: "Tether",    icon: "/assets/usdt.svg", supported: ["ETH","BSC","LSK","BASE"], balances: { },   price: 0,     changePct: 0 },
+    { symbol: "USDC", name: "USD Coin",  icon: "/assets/usdc.svg", supported: ["ETH","BSC","LSK","BASE"], balances: { }, price: 0,     changePct: 0 },
+    { symbol: "DAI",  name: "DAI",       icon: "/assets/dai.svg",  supported: ["ETH","BSC","LSK","BASE"], balances: { },      price: 0,     changePct: 0 },
+    { symbol: "WETH", name: "Wrapped ETH", icon: "/assets/weth.svg", supported: ["ETH","BSC","LSK","BASE"], balances: { },   price: 0, changePct: 0 },
+    { symbol: "BNB",  name: "BNB",       icon: "/assets/bnb.svg",  supported: ["ETH","BSC","LSK","BASE"], balances: { },      price: 0,  changePct: 0 },
+    { symbol: "WKC",  name: "Wikicat",   icon: "/assets/wkc.svg",  supported: ["BSC"],                         balances: { },      price: 0, changePct: 0 },
+    { symbol: "cNGN", name: "compliant NGN", icon: "/assets/cngn.svg", supported: ["BASE","ETH","BSC"], balances: { }, price: 0, changePct: 0 },
   ]), []);
 
   const [selectedChain, setSelectedChain] = React.useState<ChainKey>("ALL");
   const [networkModalOpen, setNetworkModalOpen] = React.useState(false);
 
   // When selectedChain !== "ALL" you simply call:
-  const chainId = selectedChain === "ALL" ? undefined : CHAIN_IDS[selectedChain];
+  const chainId = selectedChain === "ALL" ? undefined : CHAIN_IDS[selectedChain as keyof typeof CHAIN_IDS];
   const { data: chainData } = useGetTokenWalletBalance(chainId!);
 
 
   const chainList = Object.values(CHAIN_IDS);
-  const balances = useGetAllChainBalances(chainList);
+  const { data: balancesByChain, isSuccess, isLoading } = useGetAllChainBalances(chainList);
 
-  const allBalances = React.useMemo(() => {
-  const merged: Record<string, TokenBalance & { total: number }> = {};
-
-  balances.forEach((q) => {
-    if (!q.data) return;
-
-    q.data.forEach((t) => {
-      const amount = Number(t.balance);
-
-      if (!merged[t.symbol]) {
-        merged[t.symbol] = { ...t, total: amount };
-      } else {
-        merged[t.symbol].total += amount;
-      }
+  // Map chainId (hex) to ChainKey
+  const chainIdToKey = React.useMemo(() => {
+    const map: Record<string, ChainKey> = {};
+    (Object.entries(CHAIN_IDS) as [ChainKey, string][]).forEach(([key, chainId]) => {
+      map[chainId] = key;
     });
-  });
+    return map;
+  }, []);
 
-  return Object.values(merged);
-}, [balances]);
+  // Build assets from API data - keep tokens separate per chain
+  const assetsFromAPI = React.useMemo(() => {
+    if (!balancesByChain) {
+      console.log('[Wallet] No balancesByChain data');
+      return [];
+    }
 
+    console.log('[Wallet] balancesByChain:', balancesByChain);
+    console.log('[Wallet] chainIdToKey:', chainIdToKey);
 
+    const assets: (AssetItem & { chainKey: ChainKey })[] = [];
+
+    // Process each chain's balances - keep tokens separate per chain
+    Object.entries(balancesByChain).forEach(([chainId, chainBalances]) => {
+      const chainKey = chainIdToKey[chainId];
+      console.log(`[Wallet] Processing chainId: ${chainId}, chainKey: ${chainKey}`);
+      if (!chainKey) {
+        console.warn(`[Wallet] No chainKey found for chainId: ${chainId}`);
+        return;
+      }
+
+      chainBalances.forEach((token) => {
+        const amount = Number(token.balance);
+        // Create a separate asset entry for each token on each chain
+        assets.push({
+          symbol: token.symbol,
+          name: token.name,
+          icon: getAssetIcon(token.symbol, token.logo),
+          supported: [chainKey],
+          balances: { [chainKey]: amount },
+          price: 0, // TODO: Fetch from price API
+          changePct: 0, // TODO: Fetch from price API
+          chainKey, // Store which chain this token is on
+        });
+      });
+    });
+
+    console.log('[Wallet] assetsFromAPI result:', assets);
+    return assets;
+  }, [balancesByChain, chainIdToKey]);
 
   const filteredAssets = React.useMemo(() => {
-    // Build display rows with aggregated or per-network balances
-    return ASSETS.map(a => {
+    // Use API data if it has been successfully fetched, otherwise fallback to hardcoded ASSETS
+    const assets = isSuccess ? assetsFromAPI : ASSETS;
+    console.log('[Wallet] isSuccess:', isSuccess, 'assetsFromAPI.length:', assetsFromAPI.length, 'using assets:', assets.length);
+    
+    // Filter by selected chain
+    const filtered = selectedChain === "ALL" 
+      ? assets 
+      : assets.filter(a => {
+          if (isSuccess) {
+            // For API data, check the chainKey
+            return (a as any).chainKey === selectedChain;
+          } else {
+            // For fallback ASSETS, check balances
+            return (a.balances[selectedChain] ?? 0) > 0;
+          }
+        });
+    
+    return filtered.map(a => {
       const amount = selectedChain === "ALL"
-        ? sumChains(a.balances)
+        ? (isSuccess ? (a.balances[(a as any).chainKey as ChainKey] ?? 0) : sumChains(a.balances))
         : (a.balances[selectedChain] ?? 0);
-      return { ...a, displayAmount: amount } as AssetItem & { displayAmount: number };
+      return { ...a, displayAmount: amount } as AssetItem & { displayAmount: number; chainKey?: ChainKey };
     })
-    .filter(row => row.displayAmount > 0)
-    .sort((l,r) => (r.displayAmount * r.price) - (l.displayAmount * l.price));
-  }, [ASSETS, selectedChain]);
+    // Show all assets from API even with zero balances, or show fallback while loading
+    .filter(row => isSuccess || isLoading ? true : row.displayAmount > 0)
+    .sort((l, r) => {
+      const lUsd = l.displayAmount * (l.price || 0);
+      const rUsd = r.displayAmount * (r.price || 0);
+      return rUsd - lUsd;
+    });
+  }, [assetsFromAPI, selectedChain, isSuccess]);
+
+  // Compute main balance from all assets across all chains
+  const mainBalance = React.useMemo(() => {
+    const assets = isSuccess ? assetsFromAPI : ASSETS;
+    let totalUsd = 0;
+
+    assets.forEach(a => {
+      if (isSuccess) {
+        // For API data, get balance from the chainKey
+        const chainKey = (a as any).chainKey as ChainKey;
+        const amount = a.balances[chainKey] ?? 0;
+        totalUsd += amount * (a.price || 0);
+      } else {
+        // For fallback ASSETS, sum across all chains
+        const totalAmount = sumChains(a.balances);
+        totalUsd += totalAmount * (a.price || 0);
+      }
+    });
+
+    return totalUsd;
+  }, [assetsFromAPI, isSuccess]);
 
   const CHAIN_PRIORITY: ChainKey[] = React.useMemo(() => ["ETH","BSC","LSK","BASE"], []);
   function pickBadgeChain(supported: ChainKey[], selected: ChainKey): ChainKey | null {
@@ -113,7 +195,7 @@ export default function WalletPage() {
           </section>
 
           <section className="mt-6">
-            <BalanceRow label="Main balance" amount="$22,199.09" />
+            <BalanceRow label="Main balance" amount={formatUsd(mainBalance)} />
           </section>
 
           <section className="mt-6">
@@ -148,13 +230,22 @@ export default function WalletPage() {
               {filteredAssets.map((a, idx) => {
                 const usd = (a as any).displayAmount * a.price;
                 const positive = a.changePct >= 0;
-                const badgeKey = pickBadgeChain(a.supported, selectedChain);
+                // For API data, use chainKey; for fallback ASSETS, use pickBadgeChain
+                const badgeKey = isSuccess && (a as any).chainKey 
+                  ? (selectedChain === "ALL" ? (a as any).chainKey : selectedChain)
+                  : pickBadgeChain(a.supported, selectedChain);
                 const chainChip = CHAINS.find(c => c.key === badgeKey);
                 return (
-                  <div key={`${a.symbol}-${idx}`} className="flex items-center justify-between px-3 py-3">
+                  <div key={`${a.symbol}-${(a as any).chainKey || a.symbol}-${idx}`} className="flex items-center justify-between px-3 py-3">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <Image src={a.icon} alt={a.symbol} width={48} height={48} />
+                        {a.icon ? (
+                          <Image src={a.icon} alt={a.symbol} width={48} height={48} />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600">
+                            {a.symbol.slice(0, 2)}
+                          </div>
+                        )}
                         {chainChip && chainChip.icon && (
                           <div className="absolute -right-1 -top-1 rounded-full bg-white p-0.5 shadow">
                             <Image src={chainChip.icon} alt={chainChip.name} width={16} height={16} />
@@ -162,7 +253,7 @@ export default function WalletPage() {
                         )}
                       </div>
                       <div>
-                        <div className="text-[16px] font-semibold">{a.name}</div>
+                        <div className="text-[16px] font-semibold">{a.symbol}</div>
                         <div className="text-[12px] text-gray-600">{formatAmount((a as any).displayAmount)} {a.symbol}</div>
                       </div>
                     </div>
