@@ -14,12 +14,33 @@ import { BannersStack } from "@/components/banners";
 import { TransactionsList } from "@/components/transactions";
 import React from "react";
 import AddFundsModal from "@/components/home/AddFundsModal";
+import { useGlobalBalances } from "@/hooks/useGlobalBalances";
+import { useNgnConversion } from "@/hooks/useNgnConversion";
+
+function formatUsd(n: number) {
+  return `$${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n)}`;
+}
+
+function formatNgn(n: number) {
+  return `₦${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n)}`;
+}
 
 export default function HomePage() {
   const [addOpen, setAddOpen] = React.useState(false);
 	const userId = useAuthStore((s) => s.userId);
 	const country = useAuthStore((s) => s.country);
 	const displayName = userId ? generateHandleFromUserId(userId, "shortHex") : "there";
+  const { data: balances } = useGlobalBalances();
+  const { convertUsdToNgn } = useNgnConversion();
+  
+  const availableToBorrowUsd = balances?.availableToBorrowUsd ?? 0;
+  const availableToBorrowNgn = convertUsdToNgn(availableToBorrowUsd);
   return (
     <div className="min-h-dvh">
       <main className="px-3 text-left">
@@ -33,7 +54,11 @@ export default function HomePage() {
         </section>
 
         <section className="mt-6">
-          <BalanceRow label="Available to Borrow" amount="₦1,000,000.76" secondary="≈$666.67" />
+          <BalanceRow 
+            label="Available to Borrow" 
+            amount={formatNgn(availableToBorrowNgn)} 
+            secondary={formatUsd(availableToBorrowUsd)} 
+          />
         </section>
         
         <section className="mt-6">

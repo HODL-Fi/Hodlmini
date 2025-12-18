@@ -34,6 +34,27 @@ body {
     -ms-overflow-style: none; /* IE/Edge */
     scrollbar-width: none; /* Firefox */
   }
+  .scrollbar-fancy {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(34, 0, 255, 0.3) transparent !important;
+    -ms-overflow-style: auto !important;
+  }
+  .scrollbar-fancy::-webkit-scrollbar {
+    width: 6px !important;
+    display: block !important;
+  }
+  .scrollbar-fancy::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+  }
+  .scrollbar-fancy::-webkit-scrollbar-thumb {
+    background: rgba(34, 0, 255, 0.3);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+  }
+  .scrollbar-fancy::-webkit-scrollbar-thumb:hover {
+    background: rgba(34, 0, 255, 0.5);
+  }
   .shake-x {
     animation: violent-shake-x 520ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
     will-change: transform;
@@ -60,7 +81,7 @@ body {
 * {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
-}
+} 
 
 button:hover{
   cursor: pointer;
@@ -68,4 +89,10 @@ button:hover{
 
 /* * {
   border: 1px solid red;
+} */
+
+/* .shadow-inner{
+  box-shadow: rgba(50, 50, 93, 0.15) 0px 15px 30px -6px inset, rgba(0, 0, 0, 0.13) 0px 9px 18px -8px inset;
+  padding: 15px 10px !important;
+  border-radius: 15px !important;
 } */

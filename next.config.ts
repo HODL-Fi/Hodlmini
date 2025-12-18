@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'cryptologos.cc',
       },
+      {
+        protocol: 'https',
+        hostname: 'www.dextools.io',
+      },
     ],
   },
 };

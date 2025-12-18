@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getFetch2 } from "@/utils/api/fetch";
+import { postFetch } from "@/utils/api/fetch";
 
 
 export interface AccountValue {
@@ -8,17 +8,25 @@ export interface AccountValue {
   availableToBorrow: number | string;
 }
 
+export interface AccountValueByChain {
+  [chainId: string]: AccountValue;
+}
 
-
-const useGetAccountValue = () => {
-  return useQuery<AccountValue, Error>({
-    queryKey: ["account_value"],
-    queryFn: () =>
-      getFetch2<AccountValue>(`/lending/account-value`).then((res) => res),
+const useGetAccountValue = (chainIds: Array<number | string> = []) => {
+  return useQuery<AccountValueByChain, Error>({
+    queryKey: ["account_value", ...chainIds.sort()],
+    queryFn: async () => {
+      if (chainIds.length === 0) return {};
+      const response = await postFetch<AccountValueByChain, { chainIds: string[] }>(
+        "/lending/account-values",
+        { chainIds: chainIds.map(String) }
+      );
+      return response.data;
+    },
+    enabled: chainIds.length > 0,
     staleTime: Infinity,      
     refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    // retry: false
+    refetchOnReconnect: false,
   });
 };
 

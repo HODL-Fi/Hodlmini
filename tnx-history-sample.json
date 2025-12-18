@@ -1,0 +1,52 @@
+[
+    {
+      "id": "23c14a34-60e3-41be-94ce-9c1be3f0259f",
+      "transactionType": "SEND",
+      "remark": "Sent 1000000000 of 0xc4e08f4e2e50eff89b476c9416f0b7b607edb71a to 0x1192ebAE3138F066c3914E428c0a29A8e39668E7 on chain 0x14a34",
+      "transactionHash": "0x87f3638808a1b66e940e84d66bec8fc62cf09e0068573545ae42bd576441f833",
+      "amount": "1000000000.0000",
+      "status": "SUCCESS",
+      "walletType": "BASE",
+      "createdAt": "2025-12-06T18: 31: 24.611Z",
+      "updatedAt": "2025-12-06T18: 31: 24.611Z"
+    },
+    {
+      "id": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+      "transactionHash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "walletType": "BASE",
+      "transactionType": "BORROW",
+      "amount": "5000.0000",
+      "remark": "Borrow 50000000000 of 0xc4e08f4e2e50eff89b476c9416f0b7b607edb71a from vault",
+      "transactionNo": "TXN987654321",
+      "collateralAsset": [],
+      "receiver": {
+        "name": "Jane Smith",
+        "accountNumber": "9876543210",
+        "bankName": "GTB Bank"
+        },
+      "createdAt": "2025-12-06T18: 31: 24.611Z",
+      "updatedAt": "2025-12-06T18: 31: 24.611Z"
+    },
+    {
+      "id": "58cfba74-4ff9-4f23-bef7-4a1daf2fd8ec",
+      "transactionType": "DEPOSIT",
+      "remark": "Deposit 1000000000 of 0xc4e08f4e2e50eff89b476c9416f0b7b607edb71a to vault",
+      "transactionHash": "0xf004c0e461de6c4dbd6a25999aab71e46dab4ecf0dc2f6d244dcf0d3e214c2fb",
+      "amount": "1000000000",
+      "status": "SUCCESS",
+      "walletType": "BASE",
+      "createdAt": "2025-12-15T20:51:17.852Z",
+      "updatedAt": "2025-12-15T20:51:17.852Z"
+    },
+    {
+      "id": "c8618101-7e5c-4b6f-be9e-3132dfc6832b",
+      "transactionType": "WITHDRAW",
+      "remark": "Withdraw 500000000 of 0xc4e08f4e2e50eff89b476c9416f0b7b607edb71a from vault",
+      "transactionHash": "0x404f23fd1afaaf7a05b7aed9058662846cfc0e2f415344a6cc7c7f41492f266c",
+      "amount": "500000000",
+      "status": "SUCCESS",
+      "walletType": "BASE",
+      "createdAt": "2025-12-15T21:00:00.680Z",
+      "updatedAt": "2025-12-15T21:00:00.680Z"
+    }
+]

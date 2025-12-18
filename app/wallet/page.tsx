@@ -12,19 +12,30 @@ import { WalletIcon, VaultIcon } from "@customIcons";
 import Image from "next/image";
 import Modal from "@/components/ui/Modal";
 import { CHAIN_IDS } from "@/utils/constants/chainIds";
+import { LOCAL_TOKEN_ICONS } from "@/utils/constants/localTokenIcons";
 import useGetTokenWalletBalance, { TokenBalance, useGetAllChainBalances } from "@/hooks/wallet/useGetTokenWalletBalance";
+import { useTokenMetadataBatch } from "@/hooks/prices/useTokenMetadata";
+import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
+import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
+import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
 
 export default function WalletPage() {
-  // Supported chains and assets
-  const CHAINS = React.useMemo(() => ([
-    { key: "ALL", name: "All networks", icon: "/icons/globe-alt.svg" },
-    { key: "ETH", name: "Ethereum", icon: "/chains/ethereum.svg" },
-    { key: "BSC", name: "BNB Smart Chain", icon: "/chains/bsc.svg" },
-    { key: "LSK", name: "Lisk", icon: "/chains/lisk.svg" },
-    { key: "BASE", name: "Base", icon: "/chains/base.svg" },
-  ]), []);
+  // Supported chains - only include chains that exist in CHAIN_IDS
+  const CHAINS = React.useMemo(() => {
+    const allChains = [
+      { key: "ALL", name: "All networks", icon: "/icons/globe-alt.svg" },
+      { key: "ETH", name: "Ethereum", icon: "/chains/ethereum.svg" },
+      { key: "BSC", name: "BNB Smart Chain", icon: "/chains/bsc.svg" },
+      { key: "LSK", name: "Lisk", icon: "/chains/lisk.svg" },
+      { key: "BASE", name: "Base", icon: "/chains/base.svg" },
+      { key: "TEST", name: "Test Network", icon: "/chains/test.svg" },
+    ];
+    
+    // Filter to only include chains that are in CHAIN_IDS (plus "ALL")
+    return allChains.filter(chain => chain.key === "ALL" || chain.key in CHAIN_IDS);
+  }, []);
 
-  type ChainKey = "ALL" | "ETH" | "BSC" | "LSK" | "BASE";
+  type ChainKey = "ALL" | "ETH" | "BSC" | "LSK" | "BASE" | "TEST";
   type AssetItem = {
     symbol: string;
     name: string;
@@ -36,15 +47,30 @@ export default function WalletPage() {
   };
 
   // Available local icons
-  const LOCAL_ICONS = ['eth', 'usdt', 'usdc', 'dai', 'weth', 'bnb', 'wkc', 'cngn'];
+  const LOCAL_ICONS = React.useMemo(
+    () => [...LOCAL_TOKEN_ICONS],
+    []
+  );
   
-  // Helper to get icon - prefer local, fallback to API logo
-  const getAssetIcon = (symbol: string, apiLogo: string | null): string => {
+  // Helper to get icon - prefer local, fallback to API logo, then DEXTools, then placeholder
+  const getAssetIcon = (
+    symbol: string, 
+    apiLogo: string | null, 
+    contractAddress: string | null,
+    dextoolsLogo: string | null
+  ): string => {
     const symbolLower = symbol.toLowerCase();
     if (LOCAL_ICONS.includes(symbolLower)) {
       return `/assets/${symbolLower}.svg`;
     }
-    return apiLogo || `/assets/${symbolLower}.svg`;
+    if (apiLogo) {
+      return apiLogo;
+    }
+    if (dextoolsLogo) {
+      return dextoolsLogo;
+    }
+    // Placeholder - return null to use the fallback UI component
+    return '';
   };
 
   
@@ -70,6 +96,82 @@ export default function WalletPage() {
 
   const chainList = Object.values(CHAIN_IDS);
   const { data: balancesByChain, isSuccess, isLoading } = useGetAllChainBalances(chainList);
+
+  // Build DEXTools price requests from balances
+  const priceTokens = React.useMemo(() => {
+    if (!balancesByChain) return [];
+
+    const seen = new Set<string>();
+    const tokens: { chain: ReturnType<typeof mapHexChainIdToDextools>; address: string }[] = [];
+
+    Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
+      const dextoolsChain = mapHexChainIdToDextools(hexChainId);
+      if (!dextoolsChain) return;
+
+      chainBalances.forEach((token) => {
+        let addr = token.contractAddress;
+        
+        // For ETH (native token with no contract or placeholder address), use WETH address for pricing
+        const isEthNative = token.symbol.toUpperCase() === "ETH" && 
+          (!addr || addr === "N/A" || addr === "0x0000000000000000000000000000000000000001");
+        
+        if (isEthNative) {
+          const wethAddr = getWethAddressForChain(hexChainId);
+          if (wethAddr) {
+            addr = wethAddr;
+          } else {
+            return; // No WETH address for this chain, skip
+          }
+        } else if (!addr || addr === "N/A") {
+          return; // skip other native / non-contract tokens
+        }
+
+        const key = makeDextoolsPriceKey(dextoolsChain, addr);
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        tokens.push({ chain: dextoolsChain, address: addr });
+      });
+    });
+
+    return tokens;
+  }, [balancesByChain]);
+
+  const { data: tokenPrices } = useTokenPrices(priceTokens as any);
+
+  // Build DEXTools metadata requests for tokens without local icons
+  const metadataTokens = React.useMemo(() => {
+    if (!balancesByChain) return [];
+
+    const seen = new Set<string>();
+    const tokens: { chain: ReturnType<typeof mapHexChainIdToDextools>; address: string }[] = [];
+
+    Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
+      const dextoolsChain = mapHexChainIdToDextools(hexChainId);
+      if (!dextoolsChain) return;
+
+      chainBalances.forEach((token) => {
+        const symbolLower = token.symbol.toLowerCase();
+        // Skip if we have a local icon
+        if (LOCAL_ICONS.includes(symbolLower)) return;
+        
+        const addr = token.contractAddress;
+        if (!addr || addr === "N/A") return; // skip native / non-contract tokens
+        // Skip if API already provided a logo
+        if (token.logo) return;
+
+        const key = makeDextoolsPriceKey(dextoolsChain, addr);
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        tokens.push({ chain: dextoolsChain, address: addr });
+      });
+    });
+
+    return tokens;
+  }, [balancesByChain]);
+
+  const { data: tokenMetadata } = useTokenMetadataBatch(metadataTokens as any);
 
   // Map chainId (hex) to ChainKey
   const chainIdToKey = React.useMemo(() => {
@@ -103,15 +205,55 @@ export default function WalletPage() {
 
       chainBalances.forEach((token) => {
         const amount = Number(token.balance);
+
+        // Look up price from DEXTools if we have a contract address + mapping
+        // For ETH (native token), use WETH address for pricing
+        let price = 0;
+        let changePct = 0;
+        const dextoolsChain = mapHexChainIdToDextools(chainId);
+        if (dextoolsChain && tokenPrices) {
+          let priceAddress = token.contractAddress;
+          
+          // Use WETH address for ETH tokens (native token has no contract or placeholder address)
+          const isEthNative = token.symbol.toUpperCase() === "ETH" && 
+            (!priceAddress || priceAddress === "N/A" || priceAddress === "0x0000000000000000000000000000000000000001");
+          
+          if (isEthNative) {
+            const wethAddr = getWethAddressForChain(chainId);
+            if (wethAddr) {
+              priceAddress = wethAddr;
+            }
+          }
+          
+          if (priceAddress && priceAddress !== "N/A" && priceAddress !== "0x0000000000000000000000000000000000000001") {
+            const priceKey = makeDextoolsPriceKey(dextoolsChain, priceAddress);
+            const p = (tokenPrices as any)[priceKey];
+            if (p) {
+              price = p.price ?? 0;
+              changePct = p.variation24h ?? 0;
+            }
+          }
+        }
+
+        // Look up logo from DEXTools metadata if needed
+        let dextoolsLogo: string | null = null;
+        if (dextoolsChain && token.contractAddress && token.contractAddress !== "N/A" && tokenMetadata) {
+          const metadataKey = makeDextoolsPriceKey(dextoolsChain, token.contractAddress);
+          const metadata = (tokenMetadata as any)[metadataKey];
+          if (metadata?.logo) {
+            dextoolsLogo = metadata.logo;
+          }
+        }
+
         // Create a separate asset entry for each token on each chain
         assets.push({
           symbol: token.symbol,
           name: token.name,
-          icon: getAssetIcon(token.symbol, token.logo),
+          icon: getAssetIcon(token.symbol, token.logo, token.contractAddress, dextoolsLogo),
           supported: [chainKey],
           balances: { [chainKey]: amount },
-          price: 0, // TODO: Fetch from price API
-          changePct: 0, // TODO: Fetch from price API
+          price,
+          changePct,
           chainKey, // Store which chain this token is on
         });
       });
@@ -119,7 +261,7 @@ export default function WalletPage() {
 
     console.log('[Wallet] assetsFromAPI result:', assets);
     return assets;
-  }, [balancesByChain, chainIdToKey]);
+  }, [balancesByChain, chainIdToKey, tokenPrices]);
 
   const filteredAssets = React.useMemo(() => {
     // Use API data if it has been successfully fetched, otherwise fallback to hardcoded ASSETS
@@ -145,8 +287,8 @@ export default function WalletPage() {
         : (a.balances[selectedChain] ?? 0);
       return { ...a, displayAmount: amount } as AssetItem & { displayAmount: number; chainKey?: ChainKey };
     })
-    // Show all assets from API even with zero balances, or show fallback while loading
-    .filter(row => isSuccess || isLoading ? true : row.displayAmount > 0)
+    // Filter out zero balances - only show assets with actual balance
+    .filter(row => row.displayAmount > 0)
     .sort((l, r) => {
       const lUsd = l.displayAmount * (l.price || 0);
       const rUsd = r.displayAmount * (r.price || 0);
@@ -240,7 +382,15 @@ export default function WalletPage() {
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         {a.icon ? (
-                          <Image src={a.icon} alt={a.symbol} width={48} height={48} />
+                          <div className="h-12 w-12 rounded-full overflow-hidden bg-white">
+                            <Image 
+                              src={a.icon} 
+                              alt={a.symbol} 
+                              width={48} 
+                              height={48}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
                         ) : (
                           <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600">
                             {a.symbol.slice(0, 2)}

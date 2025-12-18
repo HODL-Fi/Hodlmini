@@ -21,12 +21,65 @@ type AccountsScrollerProps = {
 
 export default function AccountsScroller({ items, className }: AccountsScrollerProps) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const pillRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [maxWidth, setMaxWidth] = useState<number | null>(null);
   const hasRunRef = useRef(false);
   const isDragging = useRef(false);
   const [dragging, setDragging] = useState(false);
   const startX = useRef(0);
   const startScrollLeft = useRef(0);
   const moved = useRef(0);
+
+  // Measure all pills and set max width - re-measure when items change
+  useEffect(() => {
+    const measurePills = () => {
+      const widths = pillRefs.current
+        .filter((el): el is HTMLDivElement => el !== null)
+        .map(el => {
+          // Temporarily remove width to measure natural size
+          const originalWidth = el.style.width;
+          el.style.width = '';
+          const width = el.offsetWidth;
+          el.style.width = originalWidth;
+          return width;
+        });
+      
+      if (widths.length > 0 && widths.some(w => w > 0)) {
+        const max = Math.max(...widths);
+        if (max > 0) {
+          setMaxWidth(max);
+        }
+      }
+    };
+
+    // Initial measurement after render
+    const timeout1 = setTimeout(() => {
+      requestAnimationFrame(measurePills);
+    }, 50);
+
+    // Re-measure after a delay to catch loaded values
+    const timeout2 = setTimeout(() => {
+      requestAnimationFrame(measurePills);
+    }, 500);
+
+    // Set up ResizeObserver to re-measure when pill sizes change
+    const observers: ResizeObserver[] = [];
+    pillRefs.current.forEach((el) => {
+      if (el) {
+        const observer = new ResizeObserver(() => {
+          measurePills();
+        });
+        observer.observe(el);
+        observers.push(observer);
+      }
+    });
+
+    return () => {
+      clearTimeout(timeout1);
+      clearTimeout(timeout2);
+      observers.forEach(obs => obs.disconnect());
+    };
+  }, [items]);
 
   useEffect(() => {
     if (hasRunRef.current) return;
@@ -102,9 +155,14 @@ export default function AccountsScroller({ items, className }: AccountsScrollerP
       }}
     >
       <div className="flex w-max items-stretch gap-3 pr-4">
-        {items.map((it) => (
+        {items.map((it, index) => (
+          <div 
+            key={it.id} 
+            ref={(el) => { pillRefs.current[index] = el; }}
+            className="flex-shrink-0"
+            style={maxWidth ? { width: `${maxWidth}px` } : undefined}
+          >
           <AccountPill
-            key={it.id}
             label={it.label}
             amount={it.amount}
             icon={it.icon}
@@ -114,6 +172,7 @@ export default function AccountsScroller({ items, className }: AccountsScrollerP
             href={it.href}
             iconBgClassName={it.iconBgClassName}
           />
+          </div>
         ))}
       </div>
     </div>

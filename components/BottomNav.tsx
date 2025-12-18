@@ -28,7 +28,7 @@ export default function BottomNav() {
       <nav className="fixed bottom-[max(env(safe-area-inset-bottom),8px)] left-1/2 z-20 w-[calc(100%-16px)] max-w-[560px] -translate-x-1/2 rounded-[20px] border border-gray-200 bg-white/80 px-1.5 py-1.5 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <ul className="flex h-12 items-center justify-around gap-1 text-[11px]">
           {NAV_ITEMS.map(({ href, label, Icon }) => {
-            const isActive = pathname === href;
+            const isActive = pathname === href || pathname.startsWith(href + "/");
             const supportsVariant = Icon === HomeIcon || Icon === WalletIcon;
             const activeColor = "#2200FF";
             return (
@@ -60,7 +60,7 @@ export default function BottomNav() {
       <nav className="fixed bottom-0 left-1/2 z-20 w-full max-w-[560px] -translate-x-1/2 border-t border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-lg">
         <ul className="flex h-16 items-center justify-around px-2 text-[11px]">
           {NAV_ITEMS.map(({ href, label, Icon }) => {
-            const isActive = pathname === href;
+            const isActive = pathname === href || pathname.startsWith(href + "/");
             const supportsVariant = Icon === HomeIcon || Icon === WalletIcon;
             const activeColor = "#2200FF";
             return (

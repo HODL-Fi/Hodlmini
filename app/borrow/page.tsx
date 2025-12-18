@@ -286,7 +286,7 @@ function BorrowPageInner() {
 
             {!isExistingMode && collateralExpanded && (<>
               <div className="relative">
-                <div ref={listRef} className="mt-2 space-y-4 max-h-[160px] overflow-y-auto pr-1">
+                <div ref={listRef} className="mt-2 space-y-4 max-h-[260px] overflow-y-auto pr-1 u-shadow-inner scrollbar-fancy">
                 {collateralLines.map((line, idx) => {
                 const asset = assets.find((a) => a.symbol === line.symbol)!;
                 const balanceUsd = asset.balance * asset.priceUsd;
@@ -312,9 +312,12 @@ function BorrowPageInner() {
                       </div>
                       <div className="flex items-center gap-3">
                         {collateralLines.length > 1 && (
-                          <button type="button" className="text-red-500 cursor-pointer" onClick={() => {
+                          <button type="button" className="flex items-center gap-1.5 text-red-500 cursor-pointer" onClick={() => {
                             setCollateralLines((prev) => prev.filter((_, i) => i !== idx));
-                          }}>Remove</button>
+                          }}>
+                            <Image src="/settings/trash.svg" alt="Remove" width={14} height={14} />
+                            Remove
+                          </button>
                         )}
                         <button type="button" className="text-[#2200FF] cursor-pointer" onClick={() => handleMaxCollateral(idx)}>Max</button>
                       </div>

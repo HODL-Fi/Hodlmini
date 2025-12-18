@@ -1,23 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
-import { getFetch2 } from "@/utils/api/fetch";
+import { postFetch } from "@/utils/api/fetch";
 
-
-export interface HealthFactor {
+export interface HealthFactorEntry {
   healthFactor: number | string;
 }
 
+export interface HealthFactorByChain {
+  [chainId: string]: HealthFactorEntry;
+}
 
+const useGetHealthFactor = (chainIds: Array<number | string> = []) => {
+  const chainIdStrings = chainIds.map(String).sort();
 
-const useGetHealthFactor = () => {
-  return useQuery<HealthFactor, Error>({
-    queryKey: ["health_factor"],
-    queryFn: () =>
-      getFetch2<HealthFactor>(`/lending/health-factor`).then((res) => res),
-    staleTime: Infinity,      
+  return useQuery<HealthFactorByChain, Error>({
+    queryKey: ["health_factors", ...chainIdStrings],
+    queryFn: async () => {
+      if (chainIdStrings.length === 0) return {};
+      const res = await postFetch<HealthFactorByChain, { chainIds: string[] }>(
+        "/lending/health-factors",
+        { chainIds: chainIdStrings }
+      );
+      return res.data;
+    },
+    enabled: chainIdStrings.length > 0,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    // retry: false
+    refetchOnReconnect: false,
   });
 };
 
 export default useGetHealthFactor;
+
+
