@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { postFetch } from "@/utils/api/fetch";
 
 export interface DepositColResponse {
@@ -41,7 +41,16 @@ const depositCollateralFn = async (
 };
 
 export const useDepositCollateral = () => {
+  const queryClient = useQueryClient();
+
   return useMutation<DepositColResponse, DepositColError, DepositColRequest>({
     mutationFn: depositCollateralFn,
+    onSuccess: () => {
+      // Invalidate vault-related queries so balances, positions, and health refresh
+      queryClient.invalidateQueries({ queryKey: ["collateral_positions"] });
+      queryClient.invalidateQueries({ queryKey: ["account_value"] });
+      queryClient.invalidateQueries({ queryKey: ["health_factors"] });
+      queryClient.invalidateQueries({ queryKey: ["wallet_balance"] });
+    },
   });
 };

@@ -1,28 +1,18 @@
 import { useMemo } from "react";
-import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
-import { makeDextoolsPriceKey } from "@/utils/prices/dextools";
 
-// cNGN contract address on BSC
-const CNGN_BSC_ADDRESS = "0xa8aea66b361a8d53e8865c62d142167af28af058";
+// For now, treat cNGN as pegged 1:1 to NGN and use a fixed USD price
+// based on the DEXTools sample you provided:
+//   1 cNGN ≈ 0.0006781026816586713 USD
+const CNGN_PRICE_USD = 0.0006781026816586713;
 
 export const useNgnConversion = () => {
-  // Fetch cNGN price from DEXTools
-  const { data: prices, isLoading, error } = useTokenPrices([
-    { chain: "bsc", address: CNGN_BSC_ADDRESS },
-  ]);
+  const cngnPrice = CNGN_PRICE_USD;
 
-  const cngnPriceKey = useMemo(
-    () => makeDextoolsPriceKey("bsc", CNGN_BSC_ADDRESS),
-    []
-  );
-
-  const cngnPrice = prices?.[cngnPriceKey]?.price ?? 0;
-
-  // Conversion rate: if 1 cNGN = $X, then 1 USD = 1/X NGN
   const usdToNgnRate = useMemo(() => {
+    // If 1 cNGN = $X, and 1 cNGN ~= 1 NGN, then 1 USD = 1 / X NGN.
     if (cngnPrice <= 0) return 0;
     return 1 / cngnPrice;
-  }, [cngnPrice]);
+  }, []);
 
   const convertUsdToNgn = useMemo(
     () => (usdAmount: number) => {
@@ -36,8 +26,9 @@ export const useNgnConversion = () => {
     convertUsdToNgn,
     usdToNgnRate,
     cngnPrice,
-    isLoading,
-    error,
+    isLoading: false,
+    error: null as unknown as Error | null,
   };
 };
+
 

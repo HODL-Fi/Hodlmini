@@ -19,6 +19,8 @@ type WalletAssetLike = {
   symbol: string;
   icon: string;
   chainKey: string;
+  // Optional live USD price for this token (per 1 unit), if available.
+  price?: number;
 };
 
 type CollateralPositionLike = {
@@ -73,11 +75,20 @@ export default function VaultCollateralPositions({
         {positions.map((p, idx) => {
           const a = getAsset(p.symbol);
           const symbol = a?.symbol ?? p.symbol;
-          const priceUsd = a?.priceUsd ?? 0;
+          const symbolUpper = symbol.toUpperCase();
+
+          // ABSOLUTE source of price: Dextools-powered wallet price only.
+          const walletAssetForPosition = walletAssets.find(
+            (wa) =>
+              wa.symbol?.toUpperCase() === symbolUpper &&
+              (selectedChain === "ALL" || wa.chainKey === selectedChain)
+          );
+
+          const priceUsd = walletAssetForPosition?.price ?? 0;
           const val = p.amount * priceUsd;
 
           const backendCf = allCollateralPositions.find(
-            (cp) => cp.symbol?.toUpperCase() === symbol.toUpperCase()
+            (cp) => cp.symbol?.toUpperCase() === symbolUpper
           );
           const backendCfBps = backendCf ? Number(backendCf.cf) || 0 : 0;
           const hasBackendCf = !!backendCf && backendCfBps > 0;
@@ -92,11 +103,6 @@ export default function VaultCollateralPositions({
               ? (a?.liquidationThreshold ?? 0) * 100
               : cfPercentExact + 5;
 
-          const walletAssetForPosition = walletAssets.find(
-            (wa) =>
-              wa.symbol?.toUpperCase() === symbol.toUpperCase() &&
-              (selectedChain === "ALL" || wa.chainKey === selectedChain)
-          );
           const iconForPosition = walletAssetForPosition?.icon ?? a?.icon;
           const chainChip =
             walletAssetForPosition &&

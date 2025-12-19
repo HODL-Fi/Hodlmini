@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { postFetch } from "@/utils/api/fetch";
 
 export type withdrawColRequest = {
@@ -37,7 +37,16 @@ const withdrawCollateralFn = async (payload: withdrawColRequest): Promise<withdr
 };
 
 export const useWithdrawCollateral = () => {
+  const queryClient = useQueryClient();
+
   return useMutation<withdrawColResponse, withdrawColError, withdrawColRequest>({
     mutationFn: withdrawCollateralFn,
+    onSuccess: () => {
+      // Invalidate vault-related queries so balances, positions, and health refresh
+      queryClient.invalidateQueries({ queryKey: ["collateral_positions"] });
+      queryClient.invalidateQueries({ queryKey: ["account_value"] });
+      queryClient.invalidateQueries({ queryKey: ["health_factors"] });
+      queryClient.invalidateQueries({ queryKey: ["wallet_balance"] });
+    },
   });
 };

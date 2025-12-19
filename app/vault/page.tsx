@@ -82,10 +82,10 @@ function VaultPageInner() {
 
   const assets = React.useMemo(
     () => [
-      { symbol: "ETH", name: "Ethereum", icon: "/assets/eth.svg", priceUsd: 3500, collateralFactor: 0.7, liquidationThreshold: 0.8 },
-      { symbol: "USDT", name: "Tether", icon: "/assets/usdt.svg", priceUsd: 1, collateralFactor: 0.8, liquidationThreshold: 0.85 },
-      { symbol: "USDC", name: "USD Coin", icon: "/assets/usdc.svg", priceUsd: 1, collateralFactor: 0.85, liquidationThreshold: 0.9 },
-      { symbol: "BNB", name: "BNB", icon: "/assets/bnb.svg", priceUsd: 600, collateralFactor: 0.6, liquidationThreshold: 0.7 },
+      { symbol: "ETH", name: "Ethereum", icon: "/assets/eth.svg", priceUsd: 0, collateralFactor: 0, liquidationThreshold: 0 },
+      { symbol: "USDT", name: "Tether", icon: "/assets/usdt.svg", priceUsd: 0, collateralFactor: 0, liquidationThreshold: 0 },
+      { symbol: "USDC", name: "USD Coin", icon: "/assets/usdc.svg", priceUsd: 0, collateralFactor: 0, liquidationThreshold: 0 },
+      { symbol: "BNB", name: "BNB", icon: "/assets/bnb.svg", priceUsd: 0, collateralFactor: 0, liquidationThreshold: 0 },
     ],
     []
   );
@@ -93,6 +93,7 @@ function VaultPageInner() {
   const [positions, setPositions] = React.useState<Position[]>([]);
   const [debtUsd, setDebtUsd] = React.useState<number>(0);
   const [cfLtInfo, setCfLtInfo] = React.useState<{ symbol: string; cf: number; lt: number } | null>(null);
+  const [hfInfoOpen, setHfInfoOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
   const [editMode, setEditMode] = React.useState<"deposit" | "withdraw">("deposit");
   const [editIndex, setEditIndex] = React.useState<number | null>(null);
@@ -193,12 +194,30 @@ function VaultPageInner() {
     return set;
   }, [allCollateralPositions]);
 
-  // Hydrate positions list from backend collateral once (no simulations)
+  // Keep positions in sync with backend collateral, while preserving any local
+  // "ephemeral" zero-amount entries (used for staging a new deposit before the
+  // backend reflects it).
   React.useEffect(() => {
-    if (positions.length > 0) return;
     if (!backendPositions.length) return;
-    setPositions(backendPositions);
-  }, [backendPositions, positions.length]);
+    setPositions((prev) => {
+      const bySymbol = new Map<string, Position>();
+
+      // Start from backend truth
+      backendPositions.forEach((bp) => {
+        bySymbol.set(bp.symbol.toUpperCase(), { symbol: bp.symbol, amount: bp.amount });
+      });
+
+      // Preserve any local zero-amount entries that aren't yet in backend
+      prev.forEach((p) => {
+        const key = p.symbol.toUpperCase();
+        if (!bySymbol.has(key) && (!Number.isFinite(p.amount) || p.amount === 0)) {
+          bySymbol.set(key, p);
+        }
+      });
+
+      return Array.from(bySymbol.values());
+    });
+  }, [backendPositions]);
 
   const priceTokens = React.useMemo(() => {
     if (!balancesByChain) return [];
@@ -302,7 +321,7 @@ function VaultPageInner() {
   }, []);
 
   const walletAssets = React.useMemo<WalletAsset[]>(() => {
-    if (!balancesByChain || !collateralWhitelist) return [];
+    if (!balancesByChain) return [];
 
     const assets: WalletAsset[] = [];
 
@@ -328,8 +347,11 @@ function VaultPageInner() {
           whitelistAddress = "0x0000000000000000000000000000000000000001";
         }
 
-        if (!whitelistAddress || !collateralWhitelist.has(whitelistAddress)) {
-          // Not a valid collateral asset → skip in deposit list
+        if (
+          collateralWhitelist &&
+          (!whitelistAddress || !collateralWhitelist.has(whitelistAddress))
+        ) {
+          // Not a valid collateral asset according to backend → skip in deposit list
           return;
         }
 
@@ -393,7 +415,7 @@ function VaultPageInner() {
       const rUsd = r.amount * (r.price || 0);
       return rUsd - lUsd;
     });
-  }, [balancesByChain, chainIdToKey, tokenPrices, getAssetIcon]);
+  }, [balancesByChain, chainIdToKey, tokenPrices, getAssetIcon, collateralWhitelist, tokenMetadata]);
 
   const walletBalancesBySymbol = React.useMemo(() => {
     const bySymbol = new Map<string, number>();
@@ -550,7 +572,17 @@ function VaultPageInner() {
         {/* Capacity & Health */}
         <section className="mt-3 rounded-[16px] border border-gray-200 bg-white p-4">
           <div className="flex items-center justify-between text-[14px]">
-            <div className="text-gray-600">Health Factor</div>
+            <div className="flex items-center gap-2 text-gray-600">
+              <span>Health Factor</span>
+              <button
+                type="button"
+                aria-label="What is Health Factor?"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full hover:bg-gray-100 cursor-pointer"
+                onClick={() => setHfInfoOpen(true)}
+              >
+                <Image src="/icons/info.svg" alt="Info" width={16} height={16} />
+              </button>
+            </div>
             <div className="font-semibold">
               {apiHealthFactor !== null 
                 ? (Number.isFinite(apiHealthFactor) ? apiHealthFactor.toFixed(2) : "—")
@@ -623,19 +655,6 @@ function VaultPageInner() {
         formatAmount={formatAmount}
         formatUsd={formatUsd}
         onClose={() => setEditOpen(false)}
-        onSimulateConfirm={(numericAmount) => {
-          if (editIndex === null) return;
-          setPositions((prev) =>
-            prev.map((q, i) => {
-              if (i !== editIndex) return q;
-              const nextAmt =
-                editMode === "deposit"
-                  ? q.amount + numericAmount
-                  : Math.max(0, q.amount - numericAmount);
-              return { ...q, amount: Number(nextAmt.toFixed(6)) };
-            })
-          );
-        }}
       />
 
       {/* Asset picker for Quick Actions */}
@@ -652,30 +671,30 @@ function VaultPageInner() {
         onClose={() => setAssetPickerOpen(false)}
         onSelectDepositAsset={(symbol) => {
           const existingIndex = positions.findIndex((p) => p.symbol === symbol);
-          if (existingIndex !== -1) {
-            setEditMode("deposit");
-            setEditIndex(existingIndex);
-            setEditValue("");
-            setEditOpen(true);
-          } else {
-            const nextIndex = positions.length;
+                    if (existingIndex !== -1) {
+                      setEditMode("deposit");
+                      setEditIndex(existingIndex);
+                      setEditValue("");
+                      setEditOpen(true);
+                    } else {
+                      const nextIndex = positions.length;
             setPositions((prev) => [...prev, { symbol, amount: 0 }]);
-            setTimeout(() => {
-              setEditMode("deposit");
-              setEditIndex(nextIndex);
-              setEditValue("");
-              setEditOpen(true);
-            }, 0);
-          }
-        }}
+                      setTimeout(() => {
+                        setEditMode("deposit");
+                        setEditIndex(nextIndex);
+                        setEditValue("");
+                        setEditOpen(true);
+                      }, 0);
+                    }
+                  }}
         onSelectWithdrawPosition={(index) => {
           const p = positions[index];
           if (!p || !p.amount || p.amount <= 0) return;
-          setEditMode("withdraw");
+                      setEditMode("withdraw");
           setEditIndex(index);
-          setEditValue("");
-          setEditOpen(true);
-        }}
+                      setEditValue("");
+                      setEditOpen(true);
+                    }}
       />
       {/* CF / LT info modal */}
       <Modal open={!!cfLtInfo} onClose={() => setCfLtInfo(null)}>
@@ -700,6 +719,48 @@ function VaultPageInner() {
               </div>
             </div>
           )}
+        </div>
+      </Modal>
+      <Modal open={hfInfoOpen} onClose={() => setHfInfoOpen(false)}>
+        <div className="space-y-3">
+          <div className="flex items-start justify-between">
+            <div className="text-[18px] font-semibold">About Health Factor</div>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setHfInfoOpen(false)}
+              className="rounded-full p-2 text-gray-600 hover:bg-gray-100 cursor-pointer"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div className="space-y-2 text-[14px] text-gray-700">
+            <p>
+              Health Factor is a risk indicator that compares the USD value of your collateral at
+              its liquidation thresholds to your current debt. Higher values mean your positions
+              are safer from liquidation.
+            </p>
+            <p>
+              When Health Factor approaches 0 , your positions may be liquidated if markets move
+              against you. Values comfortably above 1+ are generally considered safer.
+            </p>
+            <div className="rounded-md bg-[#FFF7D6] p-3 text-[13px] text-gray-700">
+              Tip: If your Health Factor trends down, consider adding collateral or repaying debt to
+              reduce liquidation risk.
+            </div>
+          </div>
         </div>
       </Modal>
       <NetworkSelectModal

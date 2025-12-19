@@ -6,39 +6,40 @@ import Modal from "@/components/ui/Modal";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/useAuthStore";
 import QRCode from "react-qr-code";
+import { CHAIN_IDS } from "@/utils/constants/chainIds";
 
 export default function ReceivePage() {
   const qrContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const [shareOpen, setShareOpen] = React.useState(false);
-  const CHAINS = React.useMemo(() => ([
-    { key: "ETH", name: "Ethereum", icon: "/chains/ethereum.svg" },
-    { key: "BSC", name: "BNB Smart Chain", icon: "/chains/bsc.svg" },
-    { key: "LSK", name: "Lisk", icon: "/chains/lisk.svg" },
-    { key: "BASE", name: "Base", icon: "/chains/base.svg" },
-  ]), []);
-  const ASSETS = React.useMemo(() => ([
-    { symbol: "ETH", name: "Ethereum", icon: "/assets/eth.svg" },
-    { symbol: "USDT", name: "Tether", icon: "/assets/usdt.svg" },
-    { symbol: "USDC", name: "USD Coin", icon: "/assets/usdc.svg" },
-  ]), []);
 
-  const [assetOpen, setAssetOpen] = React.useState(false);
+  const CHAINS = React.useMemo(() => {
+    const allChains = [
+      { key: "ETH", name: "Ethereum", icon: "/chains/ethereum.svg" },
+      { key: "BSC", name: "BNB Smart Chain", icon: "/chains/bsc.svg" },
+      { key: "LSK", name: "Lisk", icon: "/chains/lisk.svg" },
+      { key: "BASE", name: "Base", icon: "/chains/base.svg" },
+      { key: "TEST", name: "Test Network", icon: "/chains/test.svg" },
+    ];
+
+    // Only show networks that exist in CHAIN_IDS for this environment
+    return allChains.filter((chain) => chain.key in CHAIN_IDS);
+  }, []);
+
   const [chainOpen, setChainOpen] = React.useState(false);
-  const [selectedAsset, setSelectedAsset] = React.useState(ASSETS[0]);
   const [selectedChain, setSelectedChain] = React.useState(CHAINS[0]);
   const evmAddress = useAuthStore((s) => s.evmAddress);
   const address = React.useMemo(() => {
     // Prefer user's EVM address for EVM-compatible networks
-    const evmChains = new Set(["ETH", "BSC", "BASE"]);
+    const evmChains = new Set(["ETH", "BSC", "BASE", "TEST"]);
     if (evmChains.has(selectedChain.key) && evmAddress) {
       return evmAddress;
     }
-    // Fallback demo addresses
+    // Fallback demo addresses (only used when no wallet is connected)
     const map: Record<string, string> = {
       ETH: "0x5A1b2C3D4E5F6A7B8C9D00112233445566778899",
       BSC: "0xBEEfBEEF00001111222233334444555566667777",
       LSK: "0x1111222233334444555566667777888899990000",
       BASE: "0xABCDEFabcdefABCDEFabcdefABCDEFabcdef1234",
+      TEST: "0x0000000000000000000000000000000000000000",
     };
     return map[selectedChain.key] || map.ETH;
   }, [selectedChain, evmAddress]);
@@ -46,91 +47,7 @@ export default function ReceivePage() {
   const copy = async (txt: string) => {
     try { await navigator.clipboard?.writeText(txt); setHint("Address copied"); setTimeout(()=>setHint(null), 1200); } catch {}
   };
-  const shareTitle = React.useMemo(() => `${selectedAsset.symbol} on ${selectedChain.name}`, [selectedAsset, selectedChain]);
-  const shareText = React.useMemo(() => `Send ${selectedAsset.symbol} on ${selectedChain.name} to:\n${address}\n\nScan the attached QR to deposit.`, [selectedAsset, selectedChain, address]);
 
-  // Convert the on-screen QR SVG to a PNG blob for sharing/downloading
-  const getQrPngBlob = React.useCallback(async (size = 512): Promise<Blob | null> => {
-    try {
-      const svg = qrContainerRef.current?.querySelector("svg");
-      if (!svg) return null;
-      const serializer = new XMLSerializer();
-      const svgString = serializer.serializeToString(svg);
-      const svgBlob = new Blob([svgString], { type: "image/svg+xml" });
-      const svgUrl = URL.createObjectURL(svgBlob);
-
-      const img = document.createElement("img");
-      const blob: Blob = await new Promise((resolve, reject) => {
-        img.onload = () => {
-          try {
-            const canvas = document.createElement("canvas");
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) { reject(new Error("Canvas context unavailable")); return; }
-            // White background for better social previews
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, size, size);
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(img, 0, 0, size, size);
-            canvas.toBlob((b) => {
-              if (b) resolve(b);
-              else reject(new Error("Failed to create PNG blob"));
-            }, "image/png", 1);
-          } catch (e) { reject(e); }
-        };
-        img.onerror = reject;
-        img.src = svgUrl;
-      });
-
-      URL.revokeObjectURL(svgUrl);
-      return blob;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const share = async () => {
-    try {
-      const anyNav: any = navigator as any;
-      const pngBlob = await getQrPngBlob(1024);
-
-      if (pngBlob && typeof anyNav?.canShare === "function" && typeof anyNav?.share === "function") {
-        const file = new File([pngBlob], "wallet-address-qr.png", { type: "image/png" });
-        if (anyNav.canShare({ files: [file] })) {
-          await anyNav.share({ title: shareTitle, text: shareText, files: [file] });
-          setHint("Shared");
-          setTimeout(()=>setHint(null), 1200);
-          return;
-        }
-      }
-
-      if (typeof anyNav?.share === "function") {
-        await anyNav.share({ title: shareTitle, text: shareText });
-        setHint("Share sheet opened");
-        setTimeout(()=>setHint(null), 1200);
-        return;
-      }
-
-      // If no native share, open modal fallback
-      setShareOpen(true);
-    } catch {
-      setShareOpen(true);
-    }
-  };
-
-  const downloadQr = async () => {
-    const pngBlob = await getQrPngBlob(1024);
-    if (!pngBlob) { setHint("QR generation failed"); setTimeout(()=>setHint(null), 1200); return; }
-    const url = URL.createObjectURL(pngBlob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "wallet-address-qr.png";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <div className="min-h-dvh">
@@ -140,13 +57,6 @@ export default function ReceivePage() {
         </div>
 
         <section className="mt-4 space-y-4">
-          <div>
-            <div className="text-[14px] text-gray-600">Asset</div>
-            <button type="button" className="mt-1 flex w-full items-center justify-between rounded-[14px] border border-gray-200 bg-white px-3 py-3 cursor-pointer" onClick={() => setAssetOpen(true)}>
-              <div className="flex items-center gap-2"><Image src={selectedAsset.icon} alt={selectedAsset.symbol} width={20} height={20} /><span className="text-[14px] font-medium">{selectedAsset.name}</span></div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-          </div>
           <div>
             <div className="text-[14px] text-gray-600">Network</div>
             <button type="button" className="mt-1 flex w-full items-center justify-between rounded-[14px] border border-gray-200 bg-white px-3 py-3 cursor-pointer" onClick={() => setChainOpen(true)}>
@@ -162,27 +72,18 @@ export default function ReceivePage() {
             </div>
             <div className="text-[14px] font-mono break-all">{address}</div>
             <div className="mt-2 flex items-center justify-center gap-2">
-              <button className="rounded-full bg-gray-100 px-3 py-1.5 text-[12px] hover:bg-[#2200FF] hover:text-white" onClick={()=>copy(address)}>Copy address</button>
-              <button className="rounded-full bg-gray-100 px-3 py-1.5 text-[12px] hover:bg-[#2200FF] hover:text-white" onClick={share}>Share</button>
+              <button
+                className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-[12px] hover:bg-[#2200FF] hover:text-white"
+                onClick={() => copy(address)}
+              >
+                <Image src="/icons/copy.svg" alt="Copy" width={14} height={14} />
+                <span>Copy address</span>
+              </button>
             </div>
             {hint && <div className="mt-2 text-[12px] text-gray-600">{hint}</div>}
           </div>
         </section>
 
-        {/* Asset modal */}
-        <Modal open={assetOpen} onClose={()=>setAssetOpen(false)}>
-          <div className="space-y-3">
-            <div className="text-[18px] font-semibold">Select asset</div>
-            <div className="divide-y divide-gray-100 rounded-2xl overflow-hidden">
-              {ASSETS.map((a)=> (
-                <button key={a.symbol} type="button" onClick={()=>{ setSelectedAsset(a); setAssetOpen(false); }} className="flex w-full items-center gap-3 bg-white px-3 py-3 text-left hover:bg-gray-50">
-                  <Image src={a.icon} alt={a.symbol} width={24} height={24} />
-                  <div className="text-[14px]">{a.name}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </Modal>
         {/* Chain modal */}
         <Modal open={chainOpen} onClose={()=>setChainOpen(false)}>
           <div className="space-y-3">
@@ -198,44 +99,6 @@ export default function ReceivePage() {
           </div>
         </Modal>
 
-        {/* Share fallback modal */}
-        <Modal open={shareOpen} onClose={()=>setShareOpen(false)}>
-          <div className="space-y-5">
-            <div className="text-[18px] font-semibold">Share address</div>
-            <div className="grid place-items-center">
-              <div style={{ background: 'white', padding: 12, borderRadius: 14 }}>
-                <QRCode value={address} size={200} level="M" />
-              </div>
-            </div>
-            <div>
-              <div className="text-[12px] text-gray-600 mb-1">Message</div>
-              <textarea value={shareText} readOnly className="w-full rounded-[12px] border border-gray-200 p-3 text-[12px] resize-none" rows={4} />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                className="rounded-full bg-gray-100 px-3 py-2 text-[12px] hover:bg-[#2200FF] hover:text-white cursor-pointer"
-                onClick={async ()=>{ try { await navigator.clipboard?.writeText(shareText); setHint("Copied message"); setTimeout(()=>setHint(null), 1200);} catch {} }}
-              >
-                Copy message
-              </button>
-              <button
-                type="button"
-                className="rounded-full bg-gray-100 px-3 py-2 text-[12px] hover:bg-[#2200FF] hover:text-white cursor-pointer"
-                onClick={downloadQr}
-              >
-                Download QR
-              </button>
-              <button
-                type="button"
-                className="rounded-full bg-[#2200FF] px-3 py-2 text-[12px] text-white cursor-pointer"
-                onClick={()=>setShareOpen(false)}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </Modal>
       </main>
     </div>
   );

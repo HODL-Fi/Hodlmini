@@ -49,7 +49,7 @@ export default function AccountPill({
         </span>
       </span>
       <span className="text-left">
-        <span className="block text-[12px] leading-3 text-gray-600">{label}</span>
+        <span className="block text-[12px] leading-3 text-gray-600 whitespace-nowrap">{label}</span>
         <span className={`block text-[16px] font-medium leading-5 tracking-tight ${
           (negative ?? /-/.test(amount)) ? "text-[#F34141]" : "text-gray-900"
         } ${hidden ? "blur-[5px]" : ""}`}>{amount}</span>

@@ -4,6 +4,7 @@ import React from "react";
 import Modal from "@/components/ui/Modal";
 import { CustomInput } from "@/components/inputs";
 import { useDepositCollateral } from "@/hooks/vault/useDepositCollateral";
+import { useWithdrawCollateral } from "@/hooks/vault/useWithdrawCollateral";
 
 type Position = { symbol: string; amount: number };
 
@@ -28,7 +29,6 @@ type Props = {
   formatAmount: (n: number) => string;
   formatUsd: (n: number) => string;
   onClose: () => void;
-  onSimulateConfirm: (numericAmount: number) => void;
 };
 
 function toUnitAmount(amount: string, decimals: number): string {
@@ -57,9 +57,11 @@ export default function VaultEditPositionModal({
   formatAmount,
   formatUsd,
   onClose,
-  onSimulateConfirm,
 }: Props) {
-  const { mutateAsync: depositCollateral, isPending: isDepositing } = useDepositCollateral();
+  const { mutateAsync: depositCollateral, isPending: isDepositing } =
+    useDepositCollateral();
+  const { mutateAsync: withdrawCollateral, isPending: isWithdrawing } =
+    useWithdrawCollateral();
 
   const symbol = position?.symbol ?? "";
   const numeric = parseFloat((editValue || "0").replace(/,/g, ""));
@@ -69,6 +71,8 @@ export default function VaultEditPositionModal({
   const maxWithdraw = position?.amount ?? 0;
   const unitPrice = walletAsset?.price ?? 0;
   const inputUsdValue = isNumber ? numeric * unitPrice : 0;
+
+  const isLoading = mode === "deposit" ? isDepositing : isWithdrawing;
 
   async function handleConfirm() {
     if (!canConfirm || !position) return;
@@ -94,9 +98,25 @@ export default function VaultEditPositionModal({
       return;
     }
 
-    // Simulation / withdraw path
-    onSimulateConfirm(numeric);
-    onClose();
+    // Real withdraw path
+    if (mode === "withdraw") {
+      if (!walletAsset || !walletAsset.address || !walletAsset.chainIdHex) return;
+
+      const amountUnits = toUnitAmount(editValue || "0", walletAsset.decimals ?? 18);
+      if (amountUnits === "0") return;
+
+      try {
+        await withdrawCollateral({
+          tokenAddress: walletAsset.address,
+          amount: amountUnits,
+          chainId: walletAsset.chainIdHex,
+        });
+        onChangeEditValue("");
+        onClose();
+      } catch {
+        // Keep modal open on error; caller can add a toast
+      }
+    }
   }
 
   return (
@@ -182,16 +202,18 @@ export default function VaultEditPositionModal({
             </button>
             <button
               type="button"
-              disabled={!canConfirm || isDepositing}
+              disabled={!canConfirm || isLoading}
               className={`w-1/2 rounded-[14px] px-4 py-3 text-[14px] font-medium text-white ${
-                canConfirm && !isDepositing
+                canConfirm && !isLoading
                   ? "bg-[#2200FF] cursor-pointer"
                   : "bg-gray-300 cursor-not-allowed"
               }`}
               onClick={handleConfirm}
             >
-              {isDepositing && mode === "deposit"
-                ? "Depositing..."
+              {isLoading
+                ? mode === "deposit"
+                  ? "Depositing..."
+                  : "Withdrawing..."
                 : mode === "deposit"
                   ? "Deposit"
                   : "Withdraw"}
