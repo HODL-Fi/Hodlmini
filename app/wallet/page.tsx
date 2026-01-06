@@ -185,21 +185,15 @@ export default function WalletPage() {
   // Build assets from API data - keep tokens separate per chain
   const assetsFromAPI = React.useMemo(() => {
     if (!balancesByChain) {
-      console.log('[Wallet] No balancesByChain data');
       return [];
     }
-
-    console.log('[Wallet] balancesByChain:', balancesByChain);
-    console.log('[Wallet] chainIdToKey:', chainIdToKey);
 
     const assets: (AssetItem & { chainKey: ChainKey })[] = [];
 
     // Process each chain's balances - keep tokens separate per chain
     Object.entries(balancesByChain).forEach(([chainId, chainBalances]) => {
       const chainKey = chainIdToKey[chainId];
-      console.log(`[Wallet] Processing chainId: ${chainId}, chainKey: ${chainKey}`);
       if (!chainKey) {
-        console.warn(`[Wallet] No chainKey found for chainId: ${chainId}`);
         return;
       }
 
@@ -259,14 +253,12 @@ export default function WalletPage() {
       });
     });
 
-    console.log('[Wallet] assetsFromAPI result:', assets);
     return assets;
   }, [balancesByChain, chainIdToKey, tokenPrices]);
 
   const filteredAssets = React.useMemo(() => {
     // Use API data if it has been successfully fetched, otherwise fallback to hardcoded ASSETS
     const assets = isSuccess ? assetsFromAPI : ASSETS;
-    console.log('[Wallet] isSuccess:', isSuccess, 'assetsFromAPI.length:', assetsFromAPI.length, 'using assets:', assets.length);
     
     // Filter by selected chain
     const filtered = selectedChain === "ALL" 
@@ -368,7 +360,23 @@ export default function WalletPage() {
               </button>
             </div>
 
-            <div className="mt-3 divide-y divide-gray-100 rounded-2xl bg-white">
+            <div className="mt-3 rounded-2xl bg-white">
+              {filteredAssets.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4">
+                  <Image 
+                    src="/icons/sad.svg" 
+                    alt="No assets" 
+                    width={72} 
+                    height={72} 
+                    className="mb-4"
+                  />
+                  <div className="text-[16px] font-semibold text-gray-900">No Assets</div>
+                  <div className="text-[12px] text-gray-600 mt-1 text-center">
+                    You don't have any assets on {selectedChain === "ALL" ? "any network" : CHAINS.find(c => c.key === selectedChain)?.name || "this network"} yet
+                  </div>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
               {filteredAssets.map((a, idx) => {
                 const usd = (a as any).displayAmount * a.price;
                 const positive = a.changePct >= 0;
@@ -414,6 +422,8 @@ export default function WalletPage() {
                   </div>
                 );
               })}
+                </div>
+              )}
             </div>
           </section>
           <NetworkSelectModal

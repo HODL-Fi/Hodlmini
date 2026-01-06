@@ -4,9 +4,6 @@
 import React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { useWeb3Auth } from "@web3auth/modal/react";
-import { useGoogleSignInAPI } from "@/hooks/auth/useGoogleSignInAPI";
 
 type Slide = {
   key: string;
@@ -48,64 +45,16 @@ export default function OnboardingPage() {
   const scrollerRef = React.useRef<HTMLDivElement | null>(null);
   const autoAdvanceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const isProgrammaticScrollRef = React.useRef(false);
-
   const router = useRouter();
 
-  const goToSignup = () => {
+  // Handle Create Account - redirect to /auth with signup mode
+  const handleCreateAccount = () => {
     router.push("/auth?mode=signup");
   };
 
-  const goToSignin = () => {
+  // Handle Log In - redirect to /auth with signin mode
+  const handleLogIn = () => {
     router.push("/auth?mode=signin");
-  };
-
-
-  const { web3Auth } = useWeb3Auth();
-  const  {mutateAsync:googleLoginUser}  = useGoogleSignInAPI();
-
- const handleLogin = async () => {
-  const { setLoading, setError, setAuth } = useAuthStore.getState();
-
-  try {
-    setLoading(true);
-    setError(null);
-
-    await web3Auth?.connect();
-
-    const identity = await web3Auth?.getUserInfo();
-    const idToken = identity?.oAuthIdToken;
-
-    if (!idToken) throw new Error("Failed to retrieve Google ID token");
-
-    console.log("Google ID Token:", idToken);
-
-    // Step 3: Call backend with ID Token
-    const res = await googleLoginUser({
-      idToken,
-      country: "ng",         // optional
-      referralCode: ""        // optional
-    });
-
-    console.log("Backend login:", res);
-
-    localStorage.setItem("accessToken", res.accessToken);
-    localStorage.setItem("refreshToken", res.refreshToken);
-
-    setAuth({
-      userId: res.userId,
-      evmAddress: res.evmAddress,
-      country: "ng",
-      idToken,
-    });
-
-    router.push("/home");
-
-  } catch (err: any) {
-    console.error(err);
-    setError(err?.message || "Login failed");
-  } finally {
-    setLoading(false);
-  }
 };
 
 
@@ -262,14 +211,13 @@ export default function OnboardingPage() {
 
 
           <button
-            // onClick={goToSignup}
-            onClick={handleLogin}
+            onClick={handleCreateAccount}
             className="block w-full rounded-[20px] bg-[#2200FF] px-4 py-3 text-[14px] font-medium text-white text-center"
           >
             Create an account
           </button>
           <button
-            onClick={goToSignin}
+            onClick={handleLogIn}
             className="block w-full rounded-[20px] bg-gray-100 px-4 py-3 text-[14px] font-medium text-gray-900 text-center"
           >
             Log in

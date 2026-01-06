@@ -7,9 +7,10 @@ type RepayConfirmingModalProps = {
   onClose: () => void;
   amount: string;
   progress?: number; // 0-100 for determinate; omit for indeterminate
+  isTokenPayment?: boolean; // true for cNGN, false for NGN
 };
 
-export default function RepayConfirmingModal({ open, onClose, amount, progress }: RepayConfirmingModalProps) {
+export default function RepayConfirmingModal({ open, onClose, amount, progress, isTokenPayment = false }: RepayConfirmingModalProps) {
   const [confirmExitOpen, setConfirmExitOpen] = React.useState(false);
   const [showSlow, setShowSlow] = React.useState(false);
   function requestClose() {
@@ -34,7 +35,11 @@ export default function RepayConfirmingModal({ open, onClose, amount, progress }
         <div className="flex items-start justify-between">
           <div>
             <div className="text-[18px] font-semibold">Confirming payment</div>
-            <div className="mt-1 text-[14px] text-gray-600">We're waiting for your bank to confirm the transfer of {amount}.</div>
+            <div className="mt-1 text-[14px] text-gray-600">
+              {isTokenPayment
+                ? `Processing your repayment of ${amount}. This may take a few moments.`
+                : `We're waiting for your bank to confirm the transfer of ${amount}.`}
+            </div>
           </div>
           <button type="button" aria-label="Close" onClick={requestClose} className="rounded-full p-2 text-gray-600 hover:bg-gray-100 cursor-pointer">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

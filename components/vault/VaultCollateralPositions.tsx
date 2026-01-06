@@ -37,6 +37,7 @@ type Props = {
   selectedChain: string;
   allCollateralPositions: CollateralPositionLike[];
   chains: ChainMeta[];
+  priceBySymbol?: Map<string, number>; // Price per token from API usdValue
   onEdit: (mode: "deposit" | "withdraw", index: number) => void;
   onShowCfLt: (symbol: string, cfFraction: number, ltFraction: number) => void;
 };
@@ -55,6 +56,7 @@ export default function VaultCollateralPositions({
   selectedChain,
   allCollateralPositions,
   chains,
+  priceBySymbol,
   onEdit,
   onShowCfLt,
 }: Props) {
@@ -77,14 +79,16 @@ export default function VaultCollateralPositions({
           const symbol = a?.symbol ?? p.symbol;
           const symbolUpper = symbol.toUpperCase();
 
-          // ABSOLUTE source of price: Dextools-powered wallet price only.
+          // Use price from API (usdValue) if available, otherwise fallback to wallet asset price
+          const priceFromApi = priceBySymbol?.get(symbolUpper);
           const walletAssetForPosition = walletAssets.find(
             (wa) =>
               wa.symbol?.toUpperCase() === symbolUpper &&
               (selectedChain === "ALL" || wa.chainKey === selectedChain)
           );
-
-          const priceUsd = walletAssetForPosition?.price ?? 0;
+          
+          // Priority: API price > wallet asset price > 0
+          const priceUsd = priceFromApi ?? walletAssetForPosition?.price ?? 0;
           const val = p.amount * priceUsd;
 
           const backendCf = allCollateralPositions.find(

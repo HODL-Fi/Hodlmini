@@ -18,6 +18,7 @@ import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
 import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
 import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
 import { useRouter } from "next/navigation";
+import { getTokenDecimals } from "@/utils/constants/tokenDecimals";
 
 export default function SendPage() {
   const router = useRouter();
@@ -394,7 +395,11 @@ export default function SendPage() {
             setLastSentSymbol(selectedAsset?.symbol ?? null);
 
             try {
-              const decimals = selectedTokenBalance?.decimals ?? 18;
+              const decimals = getTokenDecimals(
+                selectedTokenBalance?.decimals,
+                selectedTokenBalance?.symbol,
+                selectedTokenBalance?.contractAddress
+              );
               const smallestUnits = toSmallestUnits(amount, decimals);
 
               const res = await sendTx({

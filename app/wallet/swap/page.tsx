@@ -596,7 +596,8 @@ function SlippageEditor({ value, onChange }: { value: number; onChange: (v: numb
             <input
               value={input}
               onChange={(e)=>{
-                const raw = e.target.value.replace(",", ".");
+                // Remove all commas (thousand separators) first, then allow decimal point
+                const raw = e.target.value.replace(/,/g, "");
                 if (/^\d*(?:\.\d*)?$/.test(raw) || raw === "") setInput(raw);
               }}
               placeholder="0.50"

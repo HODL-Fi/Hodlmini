@@ -5,15 +5,13 @@ import React, { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { CredentialResponse, GoogleLogin, useGoogleLogin } from "@react-oauth/google";
+// Removed GoogleLogin import - now using Privy's useLoginWithOAuth
 import AuthTagCollage from "@/components/AuthTagCollage";
 import CountrySelect from "@/components/CountrySelect";
 import Modal from "@/components/ui/Modal";
-import { useGoogleSignInAPI } from "@/hooks/auth/useGoogleSignInAPI";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { useWeb3Auth } from "@web3auth/modal/react";
-import { AUTH_CONNECTION, WALLET_CONNECTORS } from "@web3auth/modal";
-import axios from "axios";
+import { useLoginWithOAuth, useLoginWithEmail } from "@privy-io/react-auth";
+import { usePrivyLogin } from "@/hooks/auth/usePrivyLogin";
 
 type AuthMode = "signup" | "signin";
 type CountryCode = string; // ISO 3166-1 alpha-2 code
@@ -37,87 +35,49 @@ function AuthPageInner() {
   const hasCountry = Boolean(country);
   const hasAccepted = acceptedTerms;
 
-  const { web3Auth } = useWeb3Auth();
-  const { mutateAsync: loginUser } = useGoogleSignInAPI();
-  
-
-
-  const handleGoogleLogin = async (googleResponse: any) => {
+  // Privy hooks for custom UI
+  const { initOAuth, loading: oauthLoading } = useLoginWithOAuth({
+    onComplete: async (params) => {
   try {
-    // const idToken = googleResponse; // <-- REAL GOOGLE JWT
-
-    // Authenticate inside Web3Auth WITHOUT modal
-    await web3Auth?.connectTo(WALLET_CONNECTORS.AUTH, {
-      authConnectionId: "hodl-test-pha",   // YOUR Google connection ID
-      authConnection: AUTH_CONNECTION.GOOGLE,
-      idToken : googleResponse,
-      extraLoginOptions: {
-        isUserIdCaseSensitive: false,
-      },
-    });
-
-    // Now Web3Auth is authenticated invisibly
-    const identity = await web3Auth?.getIdentityToken();
-    const jwt = identity?.idToken;
-
-    const userInfo = await web3Auth?.getUserInfo();
-    console.log("W3A User:", userInfo);
-
-    // 🔥 send Google token to your backend
-    // const res = await loginUser({ idToken });
-    // console.log("Backend Login:", res);
-
-  } catch (err) {
-    console.error("Custom Google login failed", err);
-  }
-  };
-  
-
-  
-const login = useGoogleLogin({
-  onSuccess: async (tokenResponse) => {
-    // You have the Access Token!
-    // Now use it to ask Google for the User Info
-    const userInfo = await axios.get(
-      'https://www.googleapis.com/oauth2/v3/userinfo',
-      { headers: { Authorization: `Bearer ${tokenResponse.access_token}` } }
-    );
-
-    console.log(userInfo.data);
-    // Output: { name: "Omorotimi...", email: "okste1234@...", picture: "..." }
+        // Pass the user from the callback to handle timing issues
+        await completePrivyLogin(country || undefined, params.user);
+      } catch (error) {
+        // Error handled in completePrivyLogin
+      }
+    },
+    onError: (error) => {
+      useAuthStore.getState().setError(typeof error === 'string' ? error : "OAuth login failed");
   },
 });
 
-  const googleLogin = useGoogleLogin({
-  flow: "implicit",
-  onSuccess: async (tokenResponse) => {
-    console.log("google tokenResponse", tokenResponse);
-
-    // tokenResponse.access_token is NOT useful for Web3Auth
-    // We need the ID TOKEN (Google JWT)
-    const userInfo = await fetch(
-      "https://www.googleapis.com/oauth2/v3/userinfo",
-      {
-        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+  const { sendCode, loginWithCode, state: emailState } = useLoginWithEmail({
+    onComplete: async (params) => {
+      try {
+        // Pass the user from the callback to handle timing issues
+        await completePrivyLogin(country || undefined, params.user);
+      } catch (error) {
+        // Error handled in completePrivyLogin
       }
-    ).then((res) => res.json());
-
-    const idToken = userInfo?.id_token;
-
-    console.log("idToken", idToken)
-
-    if (!idToken) {
-      console.error("No ID Token returned by Google");
-      return;
-    }
-
-    // handleGoogleLogin({ credential: idToken });
-  },
-  onError: () => {
-    console.log("Login Failed");
+    },
+    onError: (error) => {
+      // Handle Privy error format: {"error":"Invalid email and code combination","code":"invalid_credentials"}
+      let errorMessage = "Email login failed";
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object') {
+        // Check for Privy error format
+        const errorObj = error as any;
+        if (errorObj.error && typeof errorObj.error === 'string') {
+          errorMessage = errorObj.error;
+        } else if (errorObj.message && typeof errorObj.message === 'string') {
+          errorMessage = errorObj.message;
+        }
+      }
+      useAuthStore.getState().setError(errorMessage);
   },
   });
   
+  const { completePrivyLogin } = usePrivyLogin();
 
   const checkRequirements = () => {
     if (isSignup && (!country || !acceptedTerms)) {
@@ -127,14 +87,6 @@ const login = useGoogleLogin({
     return true; // Requirements passed
   };
 
-  const handleGoogleSuccess = (credentialResponse : any) => {
-    // This runs AFTER the successful Google login and popup closes
-    const idToken = credentialResponse.credential; // ← THIS IS THE GOOGLE ID TOKEN
-    console.log("ID TOKEN:", idToken);
-    
-    // send to backend / Web3auth / whatever
-   handleGoogleLogin(idToken);
-  };
 
 
   const isSignup = mode === "signup";
@@ -223,54 +175,25 @@ const login = useGoogleLogin({
                 <span>{isSignup ? "Sign up with Google" : "Sign in with Google"}</span>
               </button> */}
 
-              <div className="w-full  space-y-3" style={{ position: 'relative' }}>
-      
-      {/* 1. The Custom Button (Visual Element) */}
-      {/* This is the visual background. We attach the conditional logic here.
-        If the logic fails, we show the modal and prevent the click from activating 
-        the Google login flow (by returning false in the onClick handler).
-      */}
+              {/* Google Sign-In */}
       <button
         type="button"
-        // Run conditional logic. If it fails, open the modal and stop here.
-        onClick={() => {
+                onClick={async () => {
           if (!checkRequirements()) {
             return;
           }
-          // If requirements pass, the click continues and hits the invisible button underneath.
-        }}
-        className="w-full rounded-[20px] bg-gray-100 px-4 py-3 text-[14px] font-medium text-gray-900 text-center flex items-center justify-center gap-2"
-      >
-        {/* Placeholder for your Image component */}
-        {/* <Image src="/socials/google.svg" alt="Google" width={20} height={20} className="h-5 w-5" /> */}
+                  try {
+                    await initOAuth({ provider: 'google' });
+                  } catch (error) {
+                    console.error("Google OAuth init failed:", error);
+                  }
+                }}
+                disabled={oauthLoading}
+                className="w-full rounded-[20px] bg-gray-100 px-4 py-3 text-[14px] font-medium text-gray-900 text-center flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
         <img src="/socials/google.svg" alt="Google" className="h-5 w-5" />
-        <span>{isSignup ? "Sign up with Google" : "Sign in with Google"}</span>
+                <span>{oauthLoading ? "Loading..." : isSignup ? "Sign up with Google" : "Sign in with Google"}</span>
       </button>
-
-        {/* 2. The Hidden Google Login (Clickable Element) */}
-        <div 
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            opacity: 0.01, // Must be > 0 for browser click to register reliably
-            zIndex: 10,  // Ensures it sits on top of the custom button
-            overflow: 'hidden',
-            cursor: 'pointer',
-          }}
-        >
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => {
-              console.log("Login Failed");
-            }}
-            // Note: The GoogleLogin component is slightly transparent but is the element 
-            // that receives the actual user click event to trigger the popup.
-          />
-        </div>
-      </div>
 
               {/* OR divider */}
               <div className="flex items-center gap-2 my-1">
@@ -342,7 +265,7 @@ const login = useGoogleLogin({
 
               {/* Email button */}
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (isSignup) {
                     // Require explicit country and T&C selection
                     if (!country || !acceptedTerms) {
@@ -356,9 +279,27 @@ const login = useGoogleLogin({
                       setRequirementModalOpen(true);
                       return;
                     }
+                    try {
+                      await sendCode({ 
+                        email: signupEmail,
+                        disableSignup: false,
+                      });
                     setOtpEmail(signupEmail);
                     setOtpCode("");
                     setOtpModalOpen(true);
+                    } catch (error: any) {
+                      console.error("Failed to send OTP:", error);
+                      setModalVariant("email");
+                      // Provide more helpful error messages
+                      let errorMessage = "Failed to send verification code. Please try again.";
+                      if (error?.message?.includes("Captcha")) {
+                        errorMessage = "Security verification failed. Please check your browser settings, disable ad blockers, and try again.";
+                      } else if (error?.message) {
+                        errorMessage = error.message;
+                      }
+                      setModalText(errorMessage);
+                      setRequirementModalOpen(true);
+                    }
                   } else {
                     if (!isValidSigninEmail) {
                       setModalVariant("email");
@@ -366,19 +307,37 @@ const login = useGoogleLogin({
                       setRequirementModalOpen(true);
                       return;
                     }
+                    try {
+                      await sendCode({ 
+                        email: signinEmail,
+                        disableSignup: true,
+                      });
                     setOtpEmail(signinEmail);
                     setOtpCode("");
                     setOtpModalOpen(true);
+                    } catch (error: any) {
+                      console.error("Failed to send OTP:", error);
+                      setModalVariant("email");
+                      // Provide more helpful error messages
+                      let errorMessage = "Failed to send verification code. Please try again.";
+                      if (error?.message?.includes("Captcha")) {
+                        errorMessage = "Security verification failed. Please check your browser settings, disable ad blockers, and try again.";
+                      } else if (error?.message) {
+                        errorMessage = error.message;
+                      }
+                      setModalText(errorMessage);
+                      setRequirementModalOpen(true);
+                    }
                   }
                 }}
-                disabled={!isSignup ? !isValidSigninEmail : false}
+                disabled={(!isSignup ? !isValidSigninEmail : false) || emailState.status === 'sending-code' || emailState.status === 'submitting-code'}
                 className={`block w-full rounded-[20px] px-4 py-3 text-[14px] font-medium text-center ${
                   isSignup
                     ? "bg-[#2200FF] text-white"
                     : "bg-[#2200FF] text-white"
-                } ${!isSignup && !isValidSigninEmail ? "opacity-90 cursor-not-allowed" : ""}`}
+                } ${!isSignup && !isValidSigninEmail ? "opacity-90 cursor-not-allowed" : ""} ${emailState.status === 'sending-code' || emailState.status === 'submitting-code' ? "opacity-70 cursor-not-allowed" : ""}`}
               >
-                {isSignup ? "Sign up with email" : "Sign in with email"}
+                {emailState.status === 'sending-code' ? "Sending..." : emailState.status === 'submitting-code' ? "Verifying..." : isSignup ? "Sign up with email" : "Sign in with email"}
               </button>
 
               {/* State toggle link */}
@@ -414,8 +373,8 @@ const login = useGoogleLogin({
 
       
 
-      {/* Modal for unmet signup requirements */}
-      <Modal open={requirementModalOpen} onClose={() => setRequirementModalOpen(false)}>
+      {/* Modal for unmet signup requirements - higher z-index to appear above OTP modal */}
+      <Modal open={requirementModalOpen} onClose={() => setRequirementModalOpen(false)} zIndex={50}>
         <div className="space-y-5">
           <div className="flex items-start justify-between">
             <div className="text-[18px] font-semibold">
@@ -577,7 +536,29 @@ const login = useGoogleLogin({
                 })}
               </div>
               <div className="mt-2 text-[12px] text-gray-600">
-                Didn&apos;t get a code? <button type="button" className="text-[#2200FF] underline">Resend</button>
+                Didn&apos;t get a code?{" "}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await sendCode({ 
+                        email: otpEmail,
+                        disableSignup: !isSignup,
+                      });
+                      setOtpCode("");
+                      otpRefs.current[0]?.focus();
+                    } catch (error: any) {
+                      console.error("Failed to resend OTP:", error);
+                      setModalVariant("email");
+                      setModalText(error?.message || "Failed to resend verification code. Please try again.");
+                      setRequirementModalOpen(true);
+                    }
+                  }}
+                  disabled={emailState.status === 'sending-code'}
+                  className="text-[#2200FF] underline disabled:opacity-50"
+                >
+                  Resend
+                </button>
               </div>
             </div>
           </div>
@@ -585,17 +566,48 @@ const login = useGoogleLogin({
           <div className="mt-1 flex items-center gap-2">
             <button
               type="button"
-              disabled={otpCode.length !== 6}
-              className={`w-full rounded-[14px] px-4 py-3 text-[14px] font-medium text-white cursor-pointer ${otpCode.length === 6 ? "bg-[#2200FF]" : "bg-[#2200FF]/70 cursor-not-allowed"}`}
-              onClick={() => {
-                // Placeholder verification success
+              disabled={otpCode.length !== 6 || emailState.status === 'submitting-code'}
+              className={`w-full rounded-[14px] px-4 py-3 text-[14px] font-medium text-white cursor-pointer ${otpCode.length === 6 && emailState.status !== 'submitting-code' ? "bg-[#2200FF]" : "bg-[#2200FF]/70 cursor-not-allowed"}`}
+              onClick={async () => {
+                if (otpCode.length !== 6) return;
+                try {
+                  await loginWithCode({ code: otpCode });
+                  // The onComplete callback in useLoginWithEmail will handle the rest
                 setOtpModalOpen(false);
-                setModalVariant("info");
-                setModalText("OTP verified. Continue flow integration here.");
-                setRequirementModalOpen(true);
+                } catch (error: any) {
+                  console.error("OTP verification failed:", error);
+                  
+                  // Extract error message from Privy error format
+                  // Privy returns: {"error":"Invalid email and code combination","code":"invalid_credentials"}
+                  let errorMessage = "Invalid verification code. Please try again.";
+                  if (typeof error === 'string') {
+                    errorMessage = error;
+                  } else if (error && typeof error === 'object') {
+                    // Check for Privy error format
+                    if (error.error && typeof error.error === 'string') {
+                      errorMessage = error.error;
+                    } else if (error.message && typeof error.message === 'string') {
+                      errorMessage = error.message;
+                    } else if (error.response?.data?.error) {
+                      errorMessage = error.response.data.error;
+                    } else if (error.response?.data?.message) {
+                      errorMessage = error.response.data.message;
+                    }
+                  }
+                  
+                  // Show error modal on top of OTP modal (don't close OTP modal)
+                  // User can dismiss error and correct their typo without requesting new code
+                  setModalVariant("email");
+                  setModalText(errorMessage);
+                  setRequirementModalOpen(true);
+                  
+                  // Keep OTP code so user can see what they typed and correct it
+                  // Focus on first input so they can easily edit
+                  otpRefs.current[0]?.focus();
+                }
               }}
             >
-              Verify
+              {emailState.status === 'submitting-code' ? "Verifying..." : "Verify"}
             </button>
           </div>
         </div>

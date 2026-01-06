@@ -4,6 +4,8 @@ import React from "react";
 import Image from "next/image";
 import BorrowTopNav from "@/components/BorrowTopNav";
 import Modal from "@/components/ui/Modal";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { submitTierOneKyc, submitTierTwoKyc, submitTierThreeKyc } from "@/utils/api/kyc";
 
 type TierStatus = "not_started" | "in_progress" | "submitted" | "verified";
 type Country = "nigeria" | "kenya" | "ghana";
@@ -15,6 +17,7 @@ const COUNTRIES: Array<{ key: Country; name: string; flag: string }> = [
 ];
 
 export default function VerificationPage() {
+  const userId = useAuthStore((state) => state.userId);
   const [country, setCountry] = React.useState<Country>("nigeria");
   const [countryModalOpen, setCountryModalOpen] = React.useState(false);
   
@@ -80,7 +83,10 @@ export default function VerificationPage() {
           {/* Standard - Only for Nigeria */}
           {isNigeria && (
             <TierCard title="Standard" desc="NIN and BVN verification" status={tier1}>
-              <div className="text-[12px] text-gray-600">Provide your NIN and BVN to proceed.</div>
+              <div className="flex items-center justify-between">
+                <div className="text-[12px] text-gray-600">Provide your NIN and BVN to proceed.</div>
+                {chip(tier1)}
+              </div>
               <div className="mt-2">
                 <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier1(true); setTier1("in_progress"); }}>Start</button>
               </div>
@@ -88,14 +94,20 @@ export default function VerificationPage() {
           )}
 
           <TierCard title="Enhanced" desc="Government ID and selfie / liveness" status={tier2}>
-            <div className="text-[12px] text-gray-600">Upload a valid ID and complete a quick liveness selfie check.</div>
+            <div className="flex items-center justify-between">
+              <div className="text-[12px] text-gray-600">Upload a valid ID and complete a quick liveness selfie check.</div>
+              {chip(tier2)}
+            </div>
             <div className="mt-2">
               <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier2(true); setTier2("in_progress"); }}>Start</button>
             </div>
           </TierCard>
 
           <TierCard title="Premium" desc="Proof of address and source of funds/wealth" status={tier3}>
-            <div className="text-[12px] text-gray-600">Upload a recent utility bill and provide source of funds. Optionally allow location check.</div>
+            <div className="flex items-center justify-between">
+              <div className="text-[12px] text-gray-600">Upload a recent utility bill and provide source of funds. Optionally allow location check.</div>
+              {chip(tier3)}
+            </div>
             <div className="mt-2">
               <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier3(true); setTier3("in_progress"); }}>Start</button>
             </div>
@@ -133,9 +145,36 @@ export default function VerificationPage() {
         </div>
       </Modal>
 
-      <Tier1Modal open={openTier1} onClose={()=>setOpenTier1(false)} onSubmit={()=>{ setTier1("submitted"); setOpenTier1(false); }} />
-      <Tier2Modal open={openTier2} onClose={()=>setOpenTier2(false)} onSubmit={()=>{ setTier2("submitted"); setOpenTier2(false); }} />
-      <Tier3Modal open={openTier3} onClose={()=>setOpenTier3(false)} onSubmit={()=>{ setTier3("submitted"); setOpenTier3(false); }} />
+      <Tier1Modal 
+        open={openTier1} 
+        userId={userId || ""}
+        onClose={()=>setOpenTier1(false)} 
+        onSubmit={async () => {
+          setTier1("submitted");
+          setOpenTier1(false);
+        }}
+        onStatusChange={setTier1}
+      />
+      <Tier2Modal 
+        open={openTier2} 
+        userId={userId || ""}
+        onClose={()=>setOpenTier2(false)} 
+        onSubmit={async () => {
+          setTier2("submitted");
+          setOpenTier2(false);
+        }}
+        onStatusChange={setTier2}
+      />
+      <Tier3Modal 
+        open={openTier3} 
+        userId={userId || ""}
+        onClose={()=>setOpenTier3(false)} 
+        onSubmit={async () => {
+          setTier3("submitted");
+          setOpenTier3(false);
+        }}
+        onStatusChange={setTier3}
+      />
     </div>
   );
 }
@@ -163,21 +202,97 @@ function TierCard({ title, desc, status, children }: { title: string; desc: stri
 }
 
 // STANDARD MODAL - Only NIN and BVN for Nigeria
-function Tier1Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () => void; onSubmit: () => void }) {
+function Tier1Modal({ 
+  open, 
+  onClose, 
+  onSubmit, 
+  userId,
+  onStatusChange 
+}: { 
+  open: boolean; 
+  onClose: () => void; 
+  onSubmit: () => void;
+  userId: string;
+  onStatusChange: (status: TierStatus) => void;
+}) {
+  const [firstName, setFirstName] = React.useState("");
+  const [lastName, setLastName] = React.useState("");
   const [bvn, setBvn] = React.useState("");
   const [nin, setNin] = React.useState("");
+  const [dob, setDob] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
   const bvnOk = /^\d{11}$/.test(bvn);
   const ninOk = /^\d{11}$/.test(nin);
-  const canSubmit = bvnOk && ninOk;
+  const phoneOk = /^\+?\d{10,15}$/.test(phone);
+  const dobOk = /^\d{4}-\d{2}-\d{2}$/.test(dob);
+  const canSubmit = firstName.trim().length > 0 && lastName.trim().length > 0 && bvnOk && ninOk && dobOk && phoneOk && !loading;
+
+  const handleSubmit = async () => {
+    if (!userId) {
+      setError("User ID is required");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await submitTierOneKyc({
+        userId,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        ninNumber: nin,
+        bvn: bvn,
+        dob: dob,
+        phone: phone,
+      });
+      
+      onStatusChange("submitted");
+      onSubmit();
+      
+      // Reset form
+      setFirstName("");
+      setLastName("");
+      setBvn("");
+      setNin("");
+      setDob("");
+      setPhone("");
+    } catch (err: any) {
+      setError(err.message || "Failed to submit verification");
+      onStatusChange("in_progress");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal open={open} onClose={onClose}>
       <div className="space-y-4">
         <div className="text-[18px] font-semibold">Standard verification</div>
-        <Field label="BVN" value={bvn} onChange={setBvn} placeholder="11 digits" />
-        <Field label="NIN" value={nin} onChange={setNin} placeholder="11 digits" />
+        {error && (
+          <div className="rounded-[14px] bg-red-50 px-3 py-2 text-[14px] text-red-700">
+            {error}
+          </div>
+        )}
+        <Field label="First Name" value={firstName} onChange={setFirstName} placeholder="Enter your first name" />
+        <Field label="Last Name" value={lastName} onChange={setLastName} placeholder="Enter your last name" />
+        <Field label="BVN" value={bvn} onChange={setBvn} placeholder="11 digits" type="tel" />
+        <Field label="NIN" value={nin} onChange={setNin} placeholder="11 digits" type="tel" />
+        <Field label="Date of Birth" value={dob} onChange={setDob} placeholder="YYYY-MM-DD" type="date" />
+        <Field label="Phone" value={phone} onChange={setPhone} placeholder="+2348012345678" type="tel" />
         <div className="flex items-center justify-end gap-2">
-          <button type="button" className="rounded-[14px] bg-gray-200 px-4 py-2 text-[14px]" onClick={onClose}>Cancel</button>
-          <button type="button" disabled={!canSubmit} className={`rounded-[14px] px-4 py-2 text-[14px] font-medium ${canSubmit?"bg-[#2200FF] text-white":"bg-gray-200 text-gray-500"}`} onClick={onSubmit}>Submit</button>
+          <button type="button" className="rounded-[14px] bg-gray-200 px-4 py-2 text-[14px]" onClick={onClose} disabled={loading}>Cancel</button>
+          <button 
+            type="button" 
+            disabled={!canSubmit} 
+            className={`rounded-[14px] px-4 py-2 text-[14px] font-medium ${canSubmit?"bg-[#2200FF] text-white":"bg-gray-200 text-gray-500"}`} 
+            onClick={handleSubmit}
+          >
+            {loading ? "Submitting..." : "Submit"}
+          </button>
         </div>
       </div>
     </Modal>
@@ -185,16 +300,72 @@ function Tier1Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () =>
 }
 
 // ENHANCED MODAL
-function Tier2Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () => void; onSubmit: () => void }) {
+function Tier2Modal({ 
+  open, 
+  onClose, 
+  onSubmit, 
+  userId,
+  onStatusChange 
+}: { 
+  open: boolean; 
+  onClose: () => void; 
+  onSubmit: () => void;
+  userId: string;
+  onStatusChange: (status: TierStatus) => void;
+}) {
   const [idType, setIdType] = React.useState("" as "drivers" | "passport" | "national" | "");
   const [idFile, setIdFile] = React.useState<File | null>(null);
   const [selfieOk, setSelfieOk] = React.useState(false);
   const [running, setRunning] = React.useState(false);
-  const canSubmit = Boolean(idType && idFile && selfieOk);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const canSubmit = Boolean(idType && idFile && selfieOk && !loading);
+
+  const handleSubmit = async () => {
+    if (!userId) {
+      setError("User ID is required");
+      return;
+    }
+
+    if (!idFile) {
+      setError("Please upload an ID file");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await submitTierTwoKyc({
+        userId,
+        idType: idType as "drivers" | "passport" | "national",
+        idFile: idFile,
+      });
+      
+      onStatusChange("submitted");
+      onSubmit();
+      
+      // Reset form
+      setIdType("" as any);
+      setIdFile(null);
+      setSelfieOk(false);
+    } catch (err: any) {
+      setError(err.message || "Failed to submit verification");
+      onStatusChange("in_progress");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal open={open} onClose={onClose}>
       <div className="space-y-4">
         <div className="text-[18px] font-semibold">Enhanced verification</div>
+        {error && (
+          <div className="rounded-[14px] bg-red-50 px-3 py-2 text-[14px] text-red-700">
+            {error}
+          </div>
+        )}
         <div>
           <div className="text-[14px] text-gray-600">Government ID</div>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -216,8 +387,15 @@ function Tier2Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () =>
           }}>{running?"Checking…":(selfieOk?"Liveness passed":"Start selfie check")}</button>
         </div>
         <div className="flex items-center justify-end gap-2">
-          <button type="button" className="rounded-[14px] bg-gray-200 px-4 py-2 text-[14px]" onClick={onClose}>Cancel</button>
-          <button type="button" disabled={!canSubmit} className={`rounded-[14px] px-4 py-2 text-[14px] font-medium ${canSubmit?"bg-[#2200FF] text-white":"bg-gray-200 text-gray-500"}`} onClick={onSubmit}>Submit</button>
+          <button type="button" className="rounded-[14px] bg-gray-200 px-4 py-2 text-[14px]" onClick={onClose} disabled={loading}>Cancel</button>
+          <button 
+            type="button" 
+            disabled={!canSubmit} 
+            className={`rounded-[14px] px-4 py-2 text-[14px] font-medium ${canSubmit?"bg-[#2200FF] text-white":"bg-gray-200 text-gray-500"}`} 
+            onClick={handleSubmit}
+          >
+            {loading ? "Submitting..." : "Submit"}
+          </button>
         </div>
       </div>
     </Modal>
@@ -225,15 +403,95 @@ function Tier2Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () =>
 }
 
 // PREMIUM MODAL
-function Tier3Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () => void; onSubmit: () => void }) {
+function Tier3Modal({ 
+  open, 
+  onClose, 
+  onSubmit, 
+  userId,
+  onStatusChange 
+}: { 
+  open: boolean; 
+  onClose: () => void; 
+  onSubmit: () => void;
+  userId: string;
+  onStatusChange: (status: TierStatus) => void;
+}) {
   const [poaFile, setPoaFile] = React.useState<File | null>(null);
   const [sof, setSof] = React.useState("");
   const [geoOk, setGeoOk] = React.useState(false);
-  const canSubmit = Boolean(poaFile && sof.trim().length >= 10);
+  const [location, setLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const canSubmit = Boolean(poaFile && sof.trim().length >= 10 && !loading);
+
+  const handleLocationCheck = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser");
+      return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setGeoOk(true);
+      },
+      () => {
+        setError("Failed to get location");
+        setGeoOk(false);
+      }
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!userId) {
+      setError("User ID is required");
+      return;
+    }
+
+    if (!poaFile) {
+      setError("Please upload a proof of address file");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await submitTierThreeKyc({
+        userId,
+        poaFile: poaFile,
+        sourceOfFunds: sof.trim(),
+        locationCheck: location || undefined,
+      });
+      
+      onStatusChange("submitted");
+      onSubmit();
+      
+      // Reset form
+      setPoaFile(null);
+      setSof("");
+      setGeoOk(false);
+      setLocation(null);
+    } catch (err: any) {
+      setError(err.message || "Failed to submit verification");
+      onStatusChange("in_progress");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal open={open} onClose={onClose}>
       <div className="space-y-4">
         <div className="text-[18px] font-semibold">Premium verification</div>
+        {error && (
+          <div className="rounded-[14px] bg-red-50 px-3 py-2 text-[14px] text-red-700">
+            {error}
+          </div>
+        )}
         <div>
           <div className="text-[14px] text-gray-600">Proof of address (recent utility bill)</div>
           <input type="file" accept="image/*,.pdf" className="mt-2 text-[12px]" onChange={(e)=>setPoaFile(e.target.files?.[0] ?? null)} />
@@ -244,25 +502,37 @@ function Tier3Modal({ open, onClose, onSubmit }: { open: boolean; onClose: () =>
         </div>
         <div>
           <div className="text-[14px] text-gray-600">Location check (optional)</div>
-          <button type="button" className={`mt-2 rounded-[12px] px-3 py-2 text-[12px] ${geoOk?"bg-emerald-100 text-emerald-700":"bg-gray-100"}`} onClick={()=>{
-            if (!navigator.geolocation) return;
-            navigator.geolocation.getCurrentPosition(()=>setGeoOk(true), ()=>setGeoOk(false));
-          }}>{geoOk?"Location verified":"Verify current location"}</button>
+          <button type="button" className={`mt-2 rounded-[12px] px-3 py-2 text-[12px] ${geoOk?"bg-emerald-100 text-emerald-700":"bg-gray-100"}`} onClick={handleLocationCheck}>
+            {geoOk?"Location verified":"Verify current location"}
+          </button>
         </div>
         <div className="flex items-center justify-end gap-2">
-          <button type="button" className="rounded-[14px] bg-gray-200 px-4 py-2 text-[14px]" onClick={onClose}>Cancel</button>
-          <button type="button" disabled={!canSubmit} className={`rounded-[14px] px-4 py-2 text-[14px] font-medium ${canSubmit?"bg-[#2200FF] text-white":"bg-gray-200 text-gray-500"}`} onClick={onSubmit}>Submit</button>
+          <button type="button" className="rounded-[14px] bg-gray-200 px-4 py-2 text-[14px]" onClick={onClose} disabled={loading}>Cancel</button>
+          <button 
+            type="button" 
+            disabled={!canSubmit} 
+            className={`rounded-[14px] px-4 py-2 text-[14px] font-medium ${canSubmit?"bg-[#2200FF] text-white":"bg-gray-200 text-gray-500"}`} 
+            onClick={handleSubmit}
+          >
+            {loading ? "Submitting..." : "Submit"}
+          </button>
         </div>
       </div>
     </Modal>
   );
 }
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string)=>void; placeholder?: string }) {
+function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string)=>void; placeholder?: string; type?: string }) {
   return (
     <div>
       <div className="text-[14px] text-gray-600">{label}</div>
-      <input value={value} onChange={(e)=>onChange(e.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-[14px] border border-gray-200 bg-white px-3 py-3 text-[16px] outline-none" />
+      <input 
+        type={type}
+        value={value} 
+        onChange={(e)=>onChange(e.target.value)} 
+        placeholder={placeholder} 
+        className="mt-2 w-full rounded-[14px] border border-gray-200 bg-white px-3 py-3 text-[16px] outline-none" 
+      />
     </div>
   );
 }

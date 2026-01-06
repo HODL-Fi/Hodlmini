@@ -1,4 +1,5 @@
 import { DEXTOOLS_CHAINS, DextoolsChainId } from "./dextoolsChains";
+import { getTokenDecimals } from "@/utils/constants/tokenDecimals";
 
 export interface TokenPriceResult {
   price: number;
@@ -117,7 +118,7 @@ export async function fetchTokenMetadata(
       name: data.name ?? "",
       symbol: data.symbol ?? "",
       logo: data.logo,
-      decimals: data.decimals ?? 18,
+      decimals: getTokenDecimals(data.decimals, data.symbol, address),
     };
   } catch {
     return null;

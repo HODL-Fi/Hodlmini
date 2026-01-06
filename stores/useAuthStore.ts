@@ -5,7 +5,8 @@ interface AuthState {
   userId: string | null;
   evmAddress: string | null;
   country: string | null;
-  idToken: string | null;
+  token: string | null; // Backend access token
+  privyAccessToken: string | null; // Privy access token
 
   loading: boolean;
   error: string | null;
@@ -17,7 +18,8 @@ interface AuthState {
     userId: string;
     evmAddress: string;
     country?: string;
-    idToken?: string;
+    token?: string;
+    privyAccessToken?: string;
   }) => void;
 
   clear: () => void;
@@ -29,7 +31,8 @@ export const useAuthStore = create<AuthState>()(
       userId: null,
       evmAddress: null,
       country: null,
-      idToken: null,
+      token: null,
+      privyAccessToken: null,
 
       loading: false,
       error: null,
@@ -37,12 +40,13 @@ export const useAuthStore = create<AuthState>()(
       setLoading: (v) => set({ loading: v }),
       setError: (v) => set({ error: v }),
 
-      setAuth: ({ userId, evmAddress, country, idToken }) =>
+      setAuth: ({ userId, evmAddress, country, token, privyAccessToken }) =>
         set({
           userId,
           evmAddress,
           country: country ?? null,
-          idToken: idToken ?? null,
+          token: token ?? null,
+          privyAccessToken: privyAccessToken ?? null,
           loading: false,
           error: null,
         }),
@@ -52,7 +56,8 @@ export const useAuthStore = create<AuthState>()(
           userId: null,
           evmAddress: null,
           country: null,
-          idToken: null,
+          token: null,
+          privyAccessToken: null,
           loading: false,
           error: null,
         }),

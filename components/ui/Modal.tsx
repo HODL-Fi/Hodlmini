@@ -8,9 +8,10 @@ type ModalProps = {
   children: React.ReactNode;
   closeOnOverlay?: boolean; // default true
   closeOnEscape?: boolean; // default true
+  zIndex?: number; // default 40
 };
 
-export default function Modal({ open, onClose, children, closeOnOverlay = true, closeOnEscape = true }: ModalProps) {
+export default function Modal({ open, onClose, children, closeOnOverlay = true, closeOnEscape = true, zIndex = 40 }: ModalProps) {
   const [mounted, setMounted] = React.useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -26,7 +27,8 @@ export default function Modal({ open, onClose, children, closeOnOverlay = true, 
   if (!mounted) return null;
   return createPortal(
     <div
-      className={`fixed inset-0 z-40 ${open ? "pointer-events-auto" : "pointer-events-none"}`}
+      className={`fixed inset-0 ${open ? "pointer-events-auto" : "pointer-events-none"}`}
+      style={{ zIndex }}
       aria-hidden={!open}
     >
       <div

@@ -11,11 +11,11 @@ import BalanceRow from "@/components/BalanceRow";
 import { VisibilityProvider } from "@/components/visibility";
 import { QuickActions } from "@/components/quickActions";
 import { BannersStack } from "@/components/banners";
-import { TransactionsList } from "@/components/transactions";
 import React from "react";
 import AddFundsModal from "@/components/home/AddFundsModal";
 import { useGlobalBalances } from "@/hooks/useGlobalBalances";
 import { useNgnConversion } from "@/hooks/useNgnConversion";
+import RecentTransactions from "@/components/home/RecentTransactions";
 
 function formatUsd(n: number) {
   return `$${new Intl.NumberFormat("en-US", {
@@ -77,16 +77,7 @@ export default function HomePage() {
         </section>
 
         <section className="mt-6">
-          <TransactionsList
-            viewAllHref="/home/transactions"
-            items={React.useMemo(() => ([
-              { id: "1", type: "borrow", amount: "-₦100,000.00", timestamp: "18 Sep at 12:19PM", status: "success" },
-              { id: "2", type: "repay", amount: "+₦50,000.00", timestamp: "18 Sep at 12:19PM", status: "success" },
-              { id: "3", type: "borrow", amount: "-₦100,000.00", timestamp: "18 Sep at 12:19PM", status: "failed" },
-              { id: "4", type: "repay", amount: "+₦50,000.00", timestamp: "18 Sep at 12:19PM", status: "success" },
-              { id: "5", type: "borrow", amount: "-₦100,000.00", timestamp: "18 Sep at 12:19PM", status: "success" },
-            ]), [])}
-          />
+          <RecentTransactions />
         </section>
         <AddFundsModal open={addOpen} onClose={() => setAddOpen(false)} />
         </VisibilityProvider>

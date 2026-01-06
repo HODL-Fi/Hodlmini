@@ -22,6 +22,7 @@ import { CHAIN_IDS } from "@/utils/constants/chainIds";
 import { LOCAL_TOKEN_ICONS } from "@/utils/constants/localTokenIcons";
 import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
 import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
+import { getTokenDecimals } from "@/utils/constants/tokenDecimals";
 
 type Position = { symbol: string; amount: number };
 
@@ -106,22 +107,6 @@ function VaultPageInner() {
     [assets]
   );
 
-  const totals = React.useMemo(() => {
-    let totalValueUSD = 0, capacityUSD = 0, liqValueUSD = 0;
-    positions.forEach((p) => {
-      const a = getAsset(p.symbol);
-      if (!a || !Number.isFinite(p.amount) || p.amount <= 0) return;
-      const val = p.amount * a.priceUsd;
-      totalValueUSD += val;
-      capacityUSD += val * (a.collateralFactor ?? 0);
-      liqValueUSD += val * (a.liquidationThreshold ?? 0);
-    });
-    const borrowRemainUSD = Math.max(0, capacityUSD - debtUsd);
-    const hf = debtUsd > 0 ? liqValueUSD / debtUsd : Infinity;
-    const riskPct = !Number.isFinite(hf) ? 0 : Math.min(100, Math.round(100 / hf));
-    return { totalValueUSD, capacityUSD, liqValueUSD, borrowRemainUSD, hf, riskPct };
-  }, [positions, debtUsd, getAsset]);
-
   function formatNumber(n: number, d = 2) {
     return new Intl.NumberFormat("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
   }
@@ -161,13 +146,113 @@ function VaultPageInner() {
     return items;
   }, [collateralPosition.data]);
 
+  // Parse usdValue from API (handles scientific notation like "9.9979195e+26")
+  const parseUsdValue = React.useCallback((usdValue: string | number | undefined): number => {
+    if (usdValue == null) return 0;
+    const str = String(usdValue).trim();
+    if (!str || str === "0") return 0;
+    const num = Number(str);
+    return Number.isFinite(num) && num > 0 ? num : 0;
+  }, []);
+
+  // Map of symbol -> price per token (from API usdValue)
+  const priceBySymbolFromApi = React.useMemo(() => {
+    const priceMap = new Map<string, number>();
+    
+    allCollateralPositions.forEach((asset) => {
+      const raw = asset.amount;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) return;
+      
+      // Use API decimals if provided, otherwise try known token decimals, fallback to 18
+      const apiDecimals = typeof asset.decimals === 'number' ? asset.decimals : 
+                         typeof asset.decimals === 'string' ? Number(asset.decimals) : 
+                         null;
+      const decimals = getTokenDecimals(apiDecimals, asset.symbol, String(asset.address || ""));
+      
+      const denom = 10 ** decimals;
+      const normalizedAmount = n / denom;
+      if (normalizedAmount <= 0) return;
+      
+      // Get USD value from API
+      const rawUsdValue = parseUsdValue(asset.usdValue);
+      if (rawUsdValue <= 0) return;
+      
+      // usdValue appears to be: amount * price * 1e18 (where amount is in smallest units, price is per token)
+      // To get price per token: price = usdValue / (amount * 1e18)
+      // Since amount = n (raw in smallest units), and normalizedAmount = n / 10^decimals:
+      // price = usdValue / (n * 1e18) = usdValue / ((normalizedAmount * 10^decimals) * 1e18)
+      // price = usdValue / (normalizedAmount * 10^decimals * 1e18)
+      let pricePerToken = 0;
+      if (rawUsdValue > 1e12) {
+        // If very large, it's likely scaled by 1e18
+        // price = usdValue / (amount * 1e18) = usdValue / (normalizedAmount * 10^decimals * 1e18)
+        pricePerToken = rawUsdValue / (normalizedAmount * denom * 1e18);
+      } else {
+        // If not scaled, usdValue is already the total USD value
+        pricePerToken = rawUsdValue / normalizedAmount;
+      }
+      
+      // Sanity check: price should be reasonable (between $0.0001 and $1,000,000)
+      if (pricePerToken > 0 && pricePerToken >= 0.0001 && pricePerToken <= 1000000) {
+        const sym = asset.symbol?.toUpperCase();
+        if (sym) {
+          // If multiple positions for same symbol, use the average or latest (for now, overwrite)
+          priceMap.set(sym, pricePerToken);
+        }
+      }
+    });
+    
+    return priceMap;
+  }, [allCollateralPositions, parseUsdValue]);
+
+  const totals = React.useMemo(() => {
+    let totalValueUSD = 0, capacityUSD = 0, liqValueUSD = 0;
+    positions.forEach((p) => {
+      if (!Number.isFinite(p.amount) || p.amount <= 0) return;
+      
+      // Use price from API (usdValue) if available, otherwise fallback to asset price
+      const sym = p.symbol.toUpperCase();
+      const priceFromApi = priceBySymbolFromApi.get(sym);
+      const priceUsd = priceFromApi ?? 0;
+      
+      if (priceUsd <= 0) return;
+      
+      const val = p.amount * priceUsd;
+      totalValueUSD += val;
+      
+      // Get CF from backend collateral positions
+      const backendPosition = allCollateralPositions.find(
+        (cp) => cp.symbol?.toUpperCase() === sym
+      );
+      const cfBps = backendPosition ? Number(backendPosition.cf) || 0 : 0;
+      const cf = cfBps / 10000; // Convert bps to fraction
+      
+      if (cf > 0) {
+        capacityUSD += val * cf;
+        // LT is typically CF + 5%, but use CF for now if not provided
+        liqValueUSD += val * cf;
+      }
+    });
+    const borrowRemainUSD = Math.max(0, capacityUSD - debtUsd);
+    const hf = debtUsd > 0 ? liqValueUSD / debtUsd : Infinity;
+    const riskPct = !Number.isFinite(hf) ? 0 : Math.min(100, Math.round(100 / hf));
+    return { totalValueUSD, capacityUSD, liqValueUSD, borrowRemainUSD, hf, riskPct };
+  }, [positions, debtUsd, priceBySymbolFromApi, allCollateralPositions]);
+
   const backendPositions = React.useMemo<BackendPosition[]>(() => {
     if (!allCollateralPositions.length) return [];
     const out: BackendPosition[] = [];
     allCollateralPositions.forEach((asset) => {
       const raw = asset.amount;
       const n = Number(raw);
-      const decimals = (asset as any).decimals ?? 18;
+      // Use API decimals if provided, otherwise try known token decimals, fallback to 18
+      // Handle case where API might return decimals as string or number
+      const apiDecimals = typeof asset.decimals === 'number' ? asset.decimals : 
+                         typeof asset.decimals === 'string' ? Number(asset.decimals) : 
+                         null;
+      const decimals = getTokenDecimals(apiDecimals, asset.symbol, String(asset.address || ""));
+      
       if (!Number.isFinite(n) || n <= 0) return;
       const denom = 10 ** decimals;
       const amount = n / denom;
@@ -405,7 +490,7 @@ function VaultPageInner() {
           price,
           address: whitelistAddress,
           chainIdHex: chainId,
-          decimals: token.decimals ?? 18,
+          decimals: getTokenDecimals(token.decimals, token.symbol, token.contractAddress),
         });
       });
     });
@@ -479,6 +564,14 @@ function VaultPageInner() {
 
     const n = Number(raw);
     if (!Number.isFinite(n)) return null;
+
+    // Health factors are typically between 0.5 and 5.0
+    // If the number is very large (> 1e12), it's likely 1e18 scaled
+    // Normalize by dividing by 1e18
+    if (n > 1e12) {
+      return n / 1e18;
+    }
+
     return n;
   }
 
@@ -507,6 +600,20 @@ function VaultPageInner() {
       return normalizeHealthFactor(entry?.healthFactor);
     }
   }, [healthFactors.data, selectedChain]);
+
+  // Calculate risk percentage from the actual health factor being displayed
+  const healthFactorForBar = React.useMemo(() => {
+    // Use API health factor if available, otherwise fall back to calculated one
+    return apiHealthFactor !== null && Number.isFinite(apiHealthFactor) 
+      ? apiHealthFactor 
+      : (Number.isFinite(totals.hf) ? totals.hf : null);
+  }, [apiHealthFactor, totals.hf]);
+
+  const riskPctForBar = React.useMemo(() => {
+    if (healthFactorForBar === null || !Number.isFinite(healthFactorForBar)) return 0;
+    if (healthFactorForBar <= 0) return 100; // Invalid or unsafe
+    return Math.min(100, Math.round(100 / healthFactorForBar));
+  }, [healthFactorForBar]);
 
   return (
     <div className="min-h-dvh">
@@ -591,7 +698,7 @@ function VaultPageInner() {
             </div>
           </div>
           <div className="mt-2">
-            <HealthBar percentage={totals.riskPct} />
+            <HealthBar percentage={riskPctForBar} />
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
             <div className="text-gray-600">Borrow limit remaining</div>
@@ -613,6 +720,7 @@ function VaultPageInner() {
           selectedChain={selectedChain}
           allCollateralPositions={allCollateralPositions}
           chains={CHAINS}
+          priceBySymbol={priceBySymbolFromApi}
           onEdit={(mode, index) => {
             setEditMode(mode);
             setEditIndex(index);

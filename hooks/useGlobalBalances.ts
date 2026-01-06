@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import useGetAccountValue from "@/hooks/vault/useGetAccountValue";
 import { useGetAllChainBalances } from "@/hooks/wallet/useGetTokenWalletBalance";
 import { CHAIN_IDS } from "@/utils/constants/chainIds";
 import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
 import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
 import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
+import { useAccountBalancesStore } from "@/stores/useAccountBalancesStore";
 
 // Exposed shape for top-level balances (wallet strip, etc.)
 export interface GlobalBalances {
@@ -143,6 +144,14 @@ export const useGlobalBalances = () => {
     collateralUsd,
     availableToBorrowUsd,
   };
+
+  // Persist to store
+  const { setBalances } = useAccountBalancesStore();
+  useEffect(() => {
+    if (data) {
+      setBalances(data);
+    }
+  }, [data, setBalances]);
 
   return { data };
 };

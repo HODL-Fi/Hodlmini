@@ -11,7 +11,7 @@ type Props = {
   defaultRange?: string | null;
 };
 
-export default function TransactionsFilterSheet({ open, onClose, onApply, defaultTypes = ["borrow", "repay"], defaultStatuses = ["success", "pending", "failed"], defaultRange = null }: Props) {
+export default function TransactionsFilterSheet({ open, onClose, onApply, defaultTypes = ["borrow", "repay", "deposit", "withdraw"], defaultStatuses = ["success", "pending", "failed"], defaultRange = null }: Props) {
   const [types, setTypes] = React.useState<string[]>(defaultTypes);
   const [statuses, setStatuses] = React.useState<string[]>(defaultStatuses);
   const [range, setRange] = React.useState<string | null>(defaultRange);
@@ -61,6 +61,8 @@ export default function TransactionsFilterSheet({ open, onClose, onApply, defaul
           <div className="mt-3 flex flex-wrap gap-2">
             {chip(types.includes("borrow"), "Money borrowed", () => toggle(types, "borrow", setTypes))}
             {chip(types.includes("repay"), "Loan repaid", () => toggle(types, "repay", setTypes))}
+            {chip(types.includes("deposit"), "Deposit", () => toggle(types, "deposit", setTypes))}
+            {chip(types.includes("withdraw"), "Withdraw", () => toggle(types, "withdraw", setTypes))}
           </div>
         </section>
 

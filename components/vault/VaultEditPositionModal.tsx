@@ -5,6 +5,7 @@ import Modal from "@/components/ui/Modal";
 import { CustomInput } from "@/components/inputs";
 import { useDepositCollateral } from "@/hooks/vault/useDepositCollateral";
 import { useWithdrawCollateral } from "@/hooks/vault/useWithdrawCollateral";
+import { getTokenDecimals } from "@/utils/constants/tokenDecimals";
 
 type Position = { symbol: string; amount: number };
 
@@ -34,8 +35,9 @@ type Props = {
 function toUnitAmount(amount: string, decimals: number): string {
   const safe = (amount || "").trim();
   if (!safe) return "0";
-  const normalized = safe.replace(",", ".");
-  const [wholeRaw, fracRaw = ""] = normalized.split(".");
+  // Remove all commas (thousand separators) first, then handle decimal point
+  const withoutCommas = safe.replace(/,/g, "");
+  const [wholeRaw, fracRaw = ""] = withoutCommas.split(".");
   const whole = wholeRaw === "" ? "0" : wholeRaw;
   const fracPadded = (fracRaw + "0".repeat(decimals)).slice(0, decimals);
   try {
@@ -81,7 +83,7 @@ export default function VaultEditPositionModal({
     if (mode === "deposit") {
       if (!walletAsset || !walletAsset.address || !walletAsset.chainIdHex) return;
 
-      const amountUnits = toUnitAmount(editValue || "0", walletAsset.decimals ?? 18);
+      const amountUnits = toUnitAmount(editValue || "0", getTokenDecimals(walletAsset.decimals, walletAsset.symbol, walletAsset.address));
       if (amountUnits === "0") return;
 
       try {
@@ -102,7 +104,7 @@ export default function VaultEditPositionModal({
     if (mode === "withdraw") {
       if (!walletAsset || !walletAsset.address || !walletAsset.chainIdHex) return;
 
-      const amountUnits = toUnitAmount(editValue || "0", walletAsset.decimals ?? 18);
+      const amountUnits = toUnitAmount(editValue || "0", getTokenDecimals(walletAsset.decimals, walletAsset.symbol, walletAsset.address));
       if (amountUnits === "0") return;
 
       try {
