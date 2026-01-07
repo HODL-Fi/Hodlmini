@@ -16,9 +16,17 @@ function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  // Track if we're mounted on client to prevent hydration issues
+  const [mounted, setMounted] = useState(false);
+  
   // Create QueryClient using useState lazy initializer
   // Must be available for both SSR and client-side
   const [queryClient] = useState(() => {
+    // Only create on client side to avoid SSR issues
+    if (typeof window === 'undefined') {
+      // Return a placeholder that will be replaced
+      return null as any;
+    }
     try {
       return new QueryClient({
         defaultOptions: {
@@ -34,6 +42,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       return new QueryClient();
     }
   });
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");
   const inWalletSub = pathname?.startsWith("/wallet/") && pathname !== "/wallet";
@@ -49,9 +62,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     sdk.actions.ready();
   }, []);
 
-
-
-
+  // Don't render QueryClientProvider until mounted and queryClient is ready
+  if (!mounted || !queryClient) {
+    return (
+      <div>
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
+          <PrivyAuthProvider>
+            <div className={`mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] ${pb}`}>
+              {children}
+              {hideBottomNav ? null : <BottomNav />}
+            </div>
+          </PrivyAuthProvider>
+        </GoogleOAuthProvider>
+      </div>
+    );
+  }
 
   return (
     <div>
