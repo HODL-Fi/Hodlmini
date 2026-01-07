@@ -10,7 +10,7 @@ import AuthTagCollage from "@/components/AuthTagCollage";
 import CountrySelect from "@/components/CountrySelect";
 import Modal from "@/components/ui/Modal";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { useLoginWithOAuth, useLoginWithEmail } from "@privy-io/react-auth";
+import { useLoginWithOAuth, useLoginWithEmail, usePrivy } from "@privy-io/react-auth";
 import { usePrivyLogin } from "@/hooks/auth/usePrivyLogin";
 
 type AuthMode = "signup" | "signin";
@@ -34,6 +34,9 @@ function AuthPageInner() {
 
   const hasCountry = Boolean(country);
   const hasAccepted = acceptedTerms;
+
+  // Check if Privy is ready
+  const { ready } = usePrivy();
 
   // Privy hooks for custom UI
   const { initOAuth, loading: oauthLoading } = useLoginWithOAuth({
@@ -279,6 +282,12 @@ function AuthPageInner() {
                       setRequirementModalOpen(true);
                       return;
                     }
+                    if (!ready) {
+                      setModalVariant("email");
+                      setModalText("Please wait, authentication is initializing...");
+                      setRequirementModalOpen(true);
+                      return;
+                    }
                     try {
                       await sendCode({ 
                         email: signupEmail,
@@ -307,6 +316,12 @@ function AuthPageInner() {
                       setRequirementModalOpen(true);
                       return;
                     }
+                    if (!ready) {
+                      setModalVariant("email");
+                      setModalText("Please wait, authentication is initializing...");
+                      setRequirementModalOpen(true);
+                      return;
+                    }
                     try {
                       await sendCode({ 
                         email: signinEmail,
@@ -330,12 +345,12 @@ function AuthPageInner() {
                     }
                   }
                 }}
-                disabled={(!isSignup ? !isValidSigninEmail : false) || emailState.status === 'sending-code' || emailState.status === 'submitting-code'}
+                disabled={!ready || (!isSignup ? !isValidSigninEmail : false) || emailState.status === 'sending-code' || emailState.status === 'submitting-code'}
                 className={`block w-full rounded-[20px] px-4 py-3 text-[14px] font-medium text-center ${
                   isSignup
                     ? "bg-[#2200FF] text-white"
                     : "bg-[#2200FF] text-white"
-                } ${!isSignup && !isValidSigninEmail ? "opacity-90 cursor-not-allowed" : ""} ${emailState.status === 'sending-code' || emailState.status === 'submitting-code' ? "opacity-70 cursor-not-allowed" : ""}`}
+                } ${!ready || (!isSignup && !isValidSigninEmail) ? "opacity-70 cursor-not-allowed" : ""} ${emailState.status === 'sending-code' || emailState.status === 'submitting-code' ? "opacity-70 cursor-not-allowed" : ""}`}
               >
                 {emailState.status === 'sending-code' ? "Sending..." : emailState.status === 'submitting-code' ? "Verifying..." : isSignup ? "Sign up with email" : "Sign in with email"}
               </button>
@@ -540,6 +555,12 @@ function AuthPageInner() {
                 <button
                   type="button"
                   onClick={async () => {
+                    if (!ready) {
+                      setModalVariant("email");
+                      setModalText("Please wait, authentication is initializing...");
+                      setRequirementModalOpen(true);
+                      return;
+                    }
                     try {
                       await sendCode({ 
                         email: otpEmail,
@@ -554,7 +575,7 @@ function AuthPageInner() {
                       setRequirementModalOpen(true);
                     }
                   }}
-                  disabled={emailState.status === 'sending-code'}
+                  disabled={!ready || emailState.status === 'sending-code'}
                   className="text-[#2200FF] underline disabled:opacity-50"
                 >
                   Resend
@@ -566,10 +587,16 @@ function AuthPageInner() {
           <div className="mt-1 flex items-center gap-2">
             <button
               type="button"
-              disabled={otpCode.length !== 6 || emailState.status === 'submitting-code'}
-              className={`w-full rounded-[14px] px-4 py-3 text-[14px] font-medium text-white cursor-pointer ${otpCode.length === 6 && emailState.status !== 'submitting-code' ? "bg-[#2200FF]" : "bg-[#2200FF]/70 cursor-not-allowed"}`}
+              disabled={!ready || otpCode.length !== 6 || emailState.status === 'submitting-code'}
+              className={`w-full rounded-[14px] px-4 py-3 text-[14px] font-medium text-white cursor-pointer ${ready && otpCode.length === 6 && emailState.status !== 'submitting-code' ? "bg-[#2200FF]" : "bg-[#2200FF]/70 cursor-not-allowed"}`}
               onClick={async () => {
                 if (otpCode.length !== 6) return;
+                if (!ready) {
+                  setModalVariant("email");
+                  setModalText("Please wait, authentication is initializing...");
+                  setRequirementModalOpen(true);
+                  return;
+                }
                 try {
                   await loginWithCode({ code: otpCode });
                   // The onComplete callback in useLoginWithEmail will handle the rest

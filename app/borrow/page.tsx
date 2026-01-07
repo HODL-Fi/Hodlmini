@@ -1228,10 +1228,10 @@ function BorrowPageInner() {
             isExistingMode
               ? existingPositions
                   .map((pos): { symbol: string; amount: number; icon?: string } | null => {
-                    const asset = assets.find((a) => a.symbol === pos.symbol);
-                    if (!asset) return null;
-                    const amt = typeof pos.amount === "number" ? pos.amount : parseFloat(String(pos.amount || "0").replace(/,/g, ""));
-                    return { symbol: asset.symbol, amount: isFinite(amt) ? amt : 0, icon: asset.icon };
+                  const asset = assets.find((a) => a.symbol === pos.symbol);
+                  if (!asset) return null;
+                  const amt = typeof pos.amount === "number" ? pos.amount : parseFloat(String(pos.amount || "0").replace(/,/g, ""));
+                  return { symbol: asset.symbol, amount: isFinite(amt) ? amt : 0, icon: asset.icon };
                   })
                   .filter((c): c is { symbol: string; amount: number; icon?: string } => c !== null)
               : collateralLines.map((line) => {

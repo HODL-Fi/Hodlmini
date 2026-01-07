@@ -29,9 +29,23 @@ export interface TierThreeKycPayload {
 }
 
 export interface KycResponse {
-  success: boolean;
+  userId: string;
+  status: string;
+  tier: string;
+  ninVerified?: boolean;
+  bvnVerified?: boolean;
+  isFullyVerified?: boolean;
+  firstName?: string | null;
+  lastName?: string | null;
+  middleName?: string | null;
+  dob?: string | null;
+  gender?: string | null;
+  resultCode?: string | null;
+  resultText?: string | null;
+  nextStep?: string;
   message?: string;
-  data?: any;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Tier 1 KYC - NIN and BVN verification
