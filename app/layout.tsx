@@ -25,6 +25,7 @@ import {
 import "./globals.css";
 import AppShell from "@/components/AppShell";
 import { FontProvider } from "@/contexts/FontContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Existing fonts
 const geistSans = Geist({
@@ -220,11 +221,13 @@ export default function RootLayout({
       <body
         className={`${allFontVariables} antialiased`}
       >
-        <FontProvider>
-          <AppShell>
-            {children}
-          </AppShell>
-        </FontProvider>
+        <ErrorBoundary>
+          <FontProvider>
+            <AppShell>
+              {children}
+            </AppShell>
+          </FontProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

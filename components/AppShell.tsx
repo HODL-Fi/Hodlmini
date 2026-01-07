@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import sdk from "@farcaster/miniapp-sdk";
@@ -15,47 +15,20 @@ function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Create QueryClient singleton at module level - ensures it's always available
-// This prevents React Query from trying to access undefined refs during initialization
-let queryClientSingleton: QueryClient | undefined;
-
-function getQueryClient() {
-  if (typeof window === 'undefined') {
-    // SSR: return a new instance (won't be used, but satisfies type)
-    return new QueryClient({
-      defaultOptions: {
-        queries: {
-          refetchOnWindowFocus: false,
-          retry: 1,
-        },
-      },
-    });
-  }
-  
-  // Client-side: create singleton once
-  if (!queryClientSingleton) {
-    queryClientSingleton = new QueryClient({
-      defaultOptions: {
-        queries: {
-          refetchOnWindowFocus: false,
-          retry: 1,
-        },
-      },
-    });
-  }
-  
-  return queryClientSingleton;
-}
+// Create QueryClient at module level - MUST be created before any React Query hooks run
+// This ensures it exists before React Query's internal code tries to access refs
+const queryClientSingleton = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  // Use useRef to ensure QueryClient is stable across renders
-  const queryClientRef = useRef<QueryClient | null>(null);
-  
-  if (!queryClientRef.current) {
-    queryClientRef.current = getQueryClient();
-  }
-  
-  const queryClient = queryClientRef.current;
+  // Use the module-level singleton - always available
+  const queryClient = queryClientSingleton;
   
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");

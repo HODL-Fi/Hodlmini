@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "cross-env NEXT_PRIVATE_SKIP_TURBOPACK=1 next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:local": "cross-env NEXT_PRIVATE_SKIP_TURBOPACK=1 NODE_ENV=production next build",
+    "test:prod": "npm run build:local && npm run start"
   },
   "dependencies": {
     "@farcaster/miniapp-sdk": "^0.2.1",
