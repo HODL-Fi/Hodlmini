@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import sdk from "@farcaster/miniapp-sdk";
@@ -15,43 +15,13 @@ function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Create QueryClient singleton outside component for SSR safety
-let browserQueryClient: QueryClient | undefined = undefined;
-
-function getQueryClient() {
-  if (typeof window === 'undefined') {
-    // SSR: always return a new client
-    return new QueryClient({
-      defaultOptions: {
-        queries: {
-          refetchOnWindowFocus: false,
-          retry: 1,
-        },
-      },
-    });
-  }
-  // Browser: use singleton pattern
-  if (!browserQueryClient) {
-    browserQueryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          refetchOnWindowFocus: false,
-          retry: 1,
-        },
-      },
-    });
-  }
-  return browserQueryClient;
-}
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  // Use useMemo to ensure stable reference across renders
-  const queryClient = useMemo(() => {
+  // Create QueryClient only on client side, using useState to ensure it's created once
+  const [queryClient] = useState<QueryClient | null>(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
     try {
-      return getQueryClient();
-    } catch (error) {
-      console.error('Failed to create QueryClient:', error);
-      // Fallback: create a new client if singleton fails
       return new QueryClient({
         defaultOptions: {
           queries: {
@@ -60,8 +30,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           },
         },
       });
+    } catch (error) {
+      console.error('Failed to create QueryClient:', error);
+      return null;
     }
-  }, []);
+  });
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");
   const inWalletSub = pathname?.startsWith("/wallet/") && pathname !== "/wallet";
@@ -80,6 +53,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 
 
+
+  // If QueryClient failed to initialize, render without it (fallback)
+  if (!queryClient) {
+    return (
+      <div>
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
+          <PrivyAuthProvider>
+            <div className={`mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] ${pb}`}>
+              {children}
+              {hideBottomNav ? null : <BottomNav />}
+            </div>
+          </PrivyAuthProvider>
+        </GoogleOAuthProvider>
+      </div>
+    );
+  }
 
   return (
     <div>
