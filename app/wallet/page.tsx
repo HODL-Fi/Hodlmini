@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import React from "react";
 import { VisibilityProvider } from "@/components/visibility";
 import BorrowTopNav from "@/components/BorrowTopNav";

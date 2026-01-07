@@ -1,5 +1,7 @@
  "use client";
 
+export const dynamic = 'force-dynamic';
+
 import React from "react";
 import BorrowTopNav from "@/components/BorrowTopNav";
 import Modal from "@/components/ui/Modal";

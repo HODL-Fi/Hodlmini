@@ -1,4 +1,7 @@
 "use client";
+
+export const dynamic = 'force-dynamic';
+
 import AppHeader from "@/components/AppHeader";
 import Link from "next/link";
 import { ArrowLeftIcon } from "@customIcons";

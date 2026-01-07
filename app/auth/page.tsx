@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import React, { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
