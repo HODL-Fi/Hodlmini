@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import sdk from "@farcaster/miniapp-sdk";
@@ -15,34 +15,20 @@ function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Create QueryClient singleton at module level to ensure it's available immediately
+// This prevents React Query from trying to access undefined refs during initialization
+const queryClientSingleton = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  // Track if we're mounted on client to prevent hydration issues
-  const [mounted, setMounted] = useState(false);
-  
-  // Create QueryClient using useState lazy initializer
-  // Must be available for both SSR and client-side to prevent build errors
-  const [queryClient] = useState(() => {
-    try {
-      // Always create QueryClient, even during SSR/build
-      // This prevents "No QueryClient set" errors during prerendering
-      return new QueryClient({
-        defaultOptions: {
-          queries: {
-            refetchOnWindowFocus: false,
-            retry: 1,
-          },
-        },
-      });
-    } catch (error) {
-      console.error('Failed to create QueryClient:', error);
-      // Fallback: create a basic client even if there's an error
-      return new QueryClient();
-    }
-  });
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Use module-level singleton QueryClient - always available and stable
+  const queryClient = queryClientSingleton;
   
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");
