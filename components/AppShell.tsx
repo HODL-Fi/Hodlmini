@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import sdk from "@farcaster/miniapp-sdk";
@@ -16,7 +16,19 @@ function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  // Use lazy initializer with useRef for React 19 compatibility
+  const queryClientRef = useRef<QueryClient>(
+    new QueryClient({
+      defaultOptions: {
+        queries: {
+          refetchOnWindowFocus: false,
+          retry: 1,
+        },
+      },
+    })
+  );
+  
+  const queryClient = queryClientRef.current;
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");
   const inWalletSub = pathname?.startsWith("/wallet/") && pathname !== "/wallet";
@@ -46,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 {children}
                 {hideBottomNav ? null : <BottomNav />}
               </div>
-              <ReactQueryDevtools initialIsOpen={false} />
+              {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
             </PrivyTokenSyncWrapper>
           </PrivyAuthProvider>
         </GoogleOAuthProvider>
