@@ -17,14 +17,14 @@ export async function GET() {
         },
         "miniapp": {
             "version": "1",
-            "name": "Just HODL It.",
+            "name": "HODL",
             "homeUrl": "https://app.joinhodl.com/",
             "iconUrl": "https://app.joinhodl.com/logos/App_Icon.png",
-            "splashImageUrl": "https://app.joinhodl.com/logos/HODL_Primary_BlockBlue.svg",
+            "splashImageUrl": "https://app.joinhodl.com/logos/App_Icon.png",
             "splashBackgroundColor": "#ffffff",
             "webhookUrl": "https://ex.co/api/webhook",
             "subtitle": "Hodl strong. Spend easy",
-            "description": "Keep your assets. Minimize your portfolio.",
+            "description": "Keep your assets. Maximize your portfolio.",
             "screenshotUrls": [
                 "https://framerusercontent.com/images/QfooZw9LMnkCZk8oTgAi13Ysuy4.png",
                 "https://app.joinhodl.com/logos/HODL_Primary_BlockBlue.svg",
@@ -41,7 +41,7 @@ export async function GET() {
             "heroImageUrl": "https://app.joinhodl.com/logos/App_Icon.png",
             "tagline": "Hodl strong. Spend easy",
             "ogTitle": "Just HODL It.",
-            "ogDescription": "Keep your assets. Minimize your portfolio.",
+            "ogDescription": "Keep your assets. Maximize your portfolio.",
             "ogImageUrl": "https://app.joinhodl.com/logos/App_Icon.png",
             "noindex": true
         }

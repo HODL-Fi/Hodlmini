@@ -6,68 +6,313 @@ import React from "react";
 import Modal from "@/components/ui/Modal";
 import { useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import useGetUserTxHistory from "@/hooks/user/useGetUserTxHistory";
+import { parseTransaction, ParsedTransaction } from "@/utils/transactions/parseTransaction";
+import { formatTransactionAmount, formatTransactionTimestamp, formatTransactionHash } from "@/utils/transactions/formatTransaction";
+import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
+import { useTokenMetadataBatch } from "@/hooks/prices/useTokenMetadata";
+import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
+import { useNgnConversion } from "@/hooks/useNgnConversion";
+import { CNGN_BASE_ADDRESS } from "@/utils/constants/cngn";
+import { isCngnToken } from "@/utils/transactions/parseTransaction";
+import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
+import { LOCAL_TOKEN_ICONS } from "@/utils/constants/localTokenIcons";
+
+function Row({ left, right }: { left: string; right: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="text-[14px] font-medium text-gray-500">{left}</div>
+      <div className="text-right text-[14px] whitespace-pre-line">{right}</div>
+    </div>
+  );
+}
+
+function TokenRow({ left, tokenSymbol, tokenAddress, tokenLogo }: { left: string; tokenSymbol: string | null; tokenAddress: string | null; tokenLogo?: string | null }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="text-[14px] font-medium text-gray-500">{left}</div>
+      <div className="flex items-center justify-end gap-2 text-right text-[14px]">
+        {tokenLogo ? (
+          <Image
+            src={tokenLogo}
+            alt={tokenSymbol || "Token"}
+            width={20}
+            height={20}
+            className="rounded-full flex-shrink-0"
+            onError={(e) => {
+              // Hide logo if it fails to load
+              const target = e.target as HTMLImageElement;
+              target.style.display = "none";
+            }}
+          />
+        ) : null}
+        <span>{tokenSymbol || "Token"}</span>
+      </div>
+    </div>
+  );
+}
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-[12px] text-gray-700 hover:bg-gray-200 cursor-pointer"
+    >
+      {copied ? "Copied!" : label}
+      <Image src="/icons/copy.svg" alt="Copy" width={14} height={14} />
+    </button>
+  );
+}
 
 export default function TransactionDetailPage() {
   const params = useParams();
   const search = useSearchParams();
   const id = String(params.id ?? "");
-  const type = (search.get("type") ?? "repay") as "repay" | "borrow";
+  const { data: transactions, isLoading } = useGetUserTxHistory();
+  const { convertUsdToNgn } = useNgnConversion();
 
-  // For now, use mock values; integrate real data source later
-  const amount = "₦100,000.00";
-  const status = (search.get("status") ?? "success") as "success" | "pending" | "failed";
-  const date = "18 Sep at 12:20PM";
+  // Find the transaction
+  const transaction = React.useMemo(() => {
+    if (!transactions) return null;
+    return transactions.find((tx) => String(tx.id) === id) ?? null;
+  }, [transactions, id]);
+
+  // Build price token request for this transaction (including metadata)
+  const priceTokens = React.useMemo(() => {
+    if (!transaction) return [];
+    const addressPattern = /0x[a-fA-F0-9]{40}/;
+    const match = transaction.remark.match(addressPattern);
+    if (!match) return [];
+
+    const address = match[0].toLowerCase();
+    const dextoolsChain = mapHexChainIdToDextools(transaction.walletType);
+    if (!dextoolsChain) return [];
+
+    // For Ether address, use WETH address for pricing and metadata
+    let priceAddress = address;
+    if (address === "0x0000000000000000000000000000000000000001") {
+      const wethAddr = getWethAddressForChain(transaction.walletType);
+      if (!wethAddr) return []; // Skip if no WETH address for this chain
+      priceAddress = wethAddr.toLowerCase();
+    }
+
+    return [{ chain: dextoolsChain, address: priceAddress }];
+  }, [transaction]);
+
+  const { data: tokenPrices } = useTokenPrices(priceTokens as any);
+  const { data: tokenMetadata } = useTokenMetadataBatch(priceTokens as any);
+
+  // Parse transaction
+  const parsedTx = React.useMemo<ParsedTransaction | null>(() => {
+    if (!transaction) return null;
+
+    // Extract token address
+    const addressPattern = /0x[a-fA-F0-9]{40}/;
+    const match = transaction.remark.match(addressPattern);
+    const tokenAddress = match ? match[0].toLowerCase() : null;
+
+    // Get token metadata
+    let metadata: { symbol?: string | null; decimals?: number | null; name?: string | null } = {};
+    if (tokenAddress && tokenMetadata) {
+      const dextoolsChain = mapHexChainIdToDextools(transaction.walletType);
+      if (dextoolsChain) {
+        // For Ether address, use WETH address for metadata lookup
+        let metaAddress = tokenAddress;
+        if (tokenAddress === "0x0000000000000000000000000000000000000001") {
+          const wethAddr = getWethAddressForChain(transaction.walletType);
+          if (wethAddr) {
+            metaAddress = wethAddr.toLowerCase();
+          }
+        }
+        const priceKey = makeDextoolsPriceKey(dextoolsChain, metaAddress);
+        const meta = tokenMetadata[priceKey];
+        if (meta) {
+          metadata = {
+            symbol: meta.symbol ?? null,
+            decimals: meta.decimals ?? null,
+            name: meta.name ?? null,
+          };
+        }
+      }
+    }
+
+    return parseTransaction(transaction, metadata);
+  }, [transaction, tokenMetadata]);
+
+  // Get token price
+  const tokenPriceUsd = React.useMemo(() => {
+    if (!parsedTx || !parsedTx.tokenAddress || !tokenPrices) return 0;
+    const dextoolsChain = mapHexChainIdToDextools(parsedTx.walletType);
+    if (!dextoolsChain) return 0;
+    
+    // For Ether address, use WETH address for price lookup
+    let priceAddress = parsedTx.tokenAddress;
+    if (parsedTx.tokenAddress.toLowerCase() === "0x0000000000000000000000000000000000000001") {
+      const wethAddr = getWethAddressForChain(parsedTx.walletType);
+      if (wethAddr) {
+        priceAddress = wethAddr.toLowerCase();
+      }
+    }
+    
+    const priceKey = makeDextoolsPriceKey(dextoolsChain, priceAddress);
+    return tokenPrices[priceKey]?.price ?? 0;
+  }, [parsedTx, tokenPrices]);
+
+  // Format amount (returns string like "0.007103 TOKEN (₦0.01)")
+  const amountString = React.useMemo(() => {
+    if (!parsedTx) return "0.00";
+    return formatTransactionAmount(parsedTx, tokenPriceUsd, convertUsdToNgn);
+  }, [parsedTx, tokenPriceUsd, convertUsdToNgn]);
+
+  // Parse amount string to extract parts for logo replacement
+  const amountParts = React.useMemo(() => {
+    if (!amountString) return { number: "0.00", symbol: null, secondary: null };
+    
+    // Match pattern: "0.007103 TOKEN (₦0.01)" or "0.007103 TOKEN"
+    const match = amountString.match(/^([\d.,]+)\s+(\w+)(\s*\([^)]+\))?$/);
+    if (match) {
+      return {
+        number: match[1],
+        symbol: match[2],
+        secondary: match[3] || null,
+      };
+    }
+    
+    // Fallback: return as-is
+    return { number: amountString, symbol: null, secondary: null };
+  }, [amountString]);
+
+  // Get token logo
+  const tokenLogo = React.useMemo<string | undefined>(() => {
+    if (!parsedTx?.tokenAddress) return undefined;
+    
+    let logo: string | undefined = undefined;
+    const LOCAL_ICONS = [...LOCAL_TOKEN_ICONS];
+
+    // Check local token icons first (by symbol)
+    if (parsedTx.tokenSymbol) {
+      const symbolLower = parsedTx.tokenSymbol.toLowerCase();
+      if (LOCAL_ICONS.includes(symbolLower)) {
+        logo = `/assets/${symbolLower}.svg`;
+      }
+    }
+
+    // Check Ether by address
+    if (!logo) {
+      const normalizedAddr = parsedTx.tokenAddress.toLowerCase();
+      const etherAddr = "0x0000000000000000000000000000000000000001";
+      if (normalizedAddr === etherAddr) {
+        if (LOCAL_ICONS.includes("eth")) {
+          logo = "/assets/eth.svg";
+        }
+      }
+    }
+
+    // Check cNGN by address
+    if (!logo) {
+      const normalizedAddr = parsedTx.tokenAddress.toLowerCase();
+      const cngnAddr = CNGN_BASE_ADDRESS.toLowerCase();
+      if (normalizedAddr === cngnAddr || normalizedAddr === `0x${cngnAddr}`) {
+        logo = "/assets/cngn.svg";
+      }
+    }
+
+    // Then try DEXTools metadata
+    if (!logo && tokenMetadata && parsedTx.tokenAddress) {
+      const dextoolsChain = mapHexChainIdToDextools(parsedTx.walletType);
+      if (dextoolsChain) {
+        // For Ether, use WETH address for metadata lookup
+        let metaAddress = parsedTx.tokenAddress;
+        if (parsedTx.tokenAddress.toLowerCase() === "0x0000000000000000000000000000000000000001") {
+          const wethAddr = getWethAddressForChain(parsedTx.walletType);
+          if (wethAddr) {
+            metaAddress = wethAddr.toLowerCase();
+          }
+        }
+        const priceKey = makeDextoolsPriceKey(dextoolsChain, metaAddress);
+        const meta = tokenMetadata[priceKey];
+        if (meta?.logo) {
+          logo = meta.logo;
+        }
+      }
+    }
+
+    return logo;
+  }, [parsedTx, tokenMetadata]);
+
+  const status = parsedTx?.status ?? ("success" as const);
+  const date = parsedTx ? formatTransactionTimestamp(parsedTx.createdAt) : "N/A";
+  const type = parsedTx?.type ?? ("deposit" as const);
 
   const [reportOpen, setReportOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
   const receiptRef = React.useRef<HTMLDivElement | null>(null);
-  
+
   async function shareAsImage() {
     try {
-    //   console.log("[shareAsImage] start");
       if (!receiptRef.current) {
         console.warn("[shareAsImage] receiptRef is null");
         return;
       }
       const { toBlob } = await import("html-to-image");
-    //   console.log("[shareAsImage] imported html-to-image");
       const node = receiptRef.current;
       const width = node.scrollWidth;
-      const pad = 48; // extra bottom space for capture
+      const pad = 48;
       const height = node.scrollHeight + pad;
-    //   console.log("[shareAsImage] node dims", { width, height });
       const blob = await toBlob(node, {
         pixelRatio: 2,
         backgroundColor: "#ffffff",
         width,
         height,
         style: { width: `${width}px`, height: `${height}px`, transform: "none" },
+        fontEmbedCSS: "",
+        useCORS: true,
+        cacheBust: true,
+        filter: (node: Node) => {
+          // Skip script and style tags
+          if (node.nodeName === "SCRIPT" || node.nodeName === "STYLE") {
+            return false;
+          }
+          return true;
+        },
       });
       if (!blob) {
         console.warn("[shareAsImage] toBlob returned null");
         return;
       }
       const file = new File([blob], `receipt-${id}.png`, { type: "image/png" });
-    //   console.log("[shareAsImage] file prepared", file);
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (navigator.canShare?.({ files: [file] })) {
-        // console.log("[shareAsImage] using navigator.share with file");
         await navigator.share({ files: [file], title: "Receipt", text: `Transaction ${id}` });
         if (!isMobile) {
-        //   console.log("[shareAsImage] desktop env detected – also downloading as fallback");
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
-          a.href = url; a.download = file.name; a.click();
+          a.href = url;
+          a.download = file.name;
+          a.click();
           URL.revokeObjectURL(url);
         }
       } else {
-        // console.log("[shareAsImage] navigator.share not available, downloading");
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url; a.download = file.name; a.click();
+        a.href = url;
+        a.download = file.name;
+        a.click();
         URL.revokeObjectURL(url);
       }
-    //   console.log("[shareAsImage] done");
     } catch (err) {
       console.error("[shareAsImage] error", err);
     } finally {
@@ -77,16 +322,14 @@ export default function TransactionDetailPage() {
 
   async function shareAsPdf() {
     try {
-    //   console.log("[shareAsPdf] start");
       if (!receiptRef.current) {
         console.warn("[shareAsPdf] receiptRef is null");
         return;
       }
       const { toCanvas } = await import("html-to-image");
-    //   console.log("[shareAsPdf] imported html-to-image");
       const node = receiptRef.current;
       const width = node.scrollWidth;
-      const pad = 48; // extra bottom space for capture
+      const pad = 48;
       const height = node.scrollHeight + pad;
       const canvas = await toCanvas(node, {
         pixelRatio: 2,
@@ -94,40 +337,87 @@ export default function TransactionDetailPage() {
         width,
         height,
         style: { width: `${width}px`, height: `${height}px`, transform: "none" },
+        fontEmbedCSS: "",
+        useCORS: true,
+        cacheBust: true,
+        filter: (node: Node) => {
+          // Skip script and style tags
+          if (node.nodeName === "SCRIPT" || node.nodeName === "STYLE") {
+            return false;
+          }
+          return true;
+        },
       });
-    //   console.log("[shareAsPdf] canvas prepared", canvas.width, canvas.height);
       const { jsPDF } = await import("jspdf");
-      const pdf = new jsPDF({ unit: "px", orientation: canvas.width >= canvas.height ? "l" : "p", format: [canvas.width, canvas.height] });
+      const pdf = new jsPDF({
+        unit: "px",
+        orientation: canvas.width >= canvas.height ? "l" : "p",
+        format: [canvas.width, canvas.height],
+      });
       pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
       const blob = pdf.output("blob");
       const file = new File([blob], `receipt-${id}.pdf`, { type: "application/pdf" });
-    //   console.log("[shareAsPdf] pdf file prepared", file);
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (navigator.canShare?.({ files: [file] })) {
-        // console.log("[shareAsPdf] using navigator.share with file");
         await navigator.share({ files: [file], title: "Receipt", text: `Transaction ${id}` });
         if (!isMobile) {
-        //   console.log("[shareAsPdf] desktop env detected – also downloading as fallback");
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
-          a.href = url; a.download = file.name; a.click();
+          a.href = url;
+          a.download = file.name;
+          a.click();
           URL.revokeObjectURL(url);
         }
       } else {
-        // console.log("[shareAsPdf] navigator.share not available, downloading");
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url; a.download = file.name; a.click();
+        a.href = url;
+        a.download = file.name;
+        a.click();
         URL.revokeObjectURL(url);
       }
-    //   console.log("[shareAsPdf] done");
     } catch (err) {
       console.error("[shareAsPdf] error", err);
     } finally {
       setShareOpen(false);
     }
   }
+
   const [message, setMessage] = React.useState("");
+
+  if (isLoading) {
+    return (
+      <div className="min-h-dvh px-2 pt-14 pb-4 text-left">
+        <AppHeader
+          title="Transaction details"
+          fixed
+          left={
+            <Link href="/home/transactions" className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
+              <ArrowLeftIcon size={18} color="#374151" />
+            </Link>
+          }
+        />
+        <div className="mt-6 text-center text-gray-500">Loading transaction...</div>
+      </div>
+    );
+  }
+
+  if (!parsedTx) {
+    return (
+      <div className="min-h-dvh px-2 pt-14 pb-4 text-left">
+        <AppHeader
+          title="Transaction details"
+          fixed
+          left={
+            <Link href="/home/transactions" className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
+              <ArrowLeftIcon size={18} color="#374151" />
+            </Link>
+          }
+        />
+        <div className="mt-6 text-center text-red-500">Transaction not found</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh px-2 pt-14 pb-4 text-left">
@@ -143,7 +433,26 @@ export default function TransactionDetailPage() {
 
       <div ref={receiptRef} className="mx-auto mt-6 w-full max-w-[560px] rounded-2xl bg-white p-4 text-left shadow relative overflow-hidden">
         <div className="text-center">
-          <div className="text-[28px] font-semibold tracking-tight">{amount}</div>
+          <div className="flex items-center justify-center gap-2 text-[28px] font-semibold tracking-tight">
+            <span>{amountParts.number}</span>
+            {tokenLogo ? (
+              <Image
+                src={tokenLogo}
+                alt={parsedTx?.tokenSymbol || "Token"}
+                width={32}
+                height={32}
+                className="rounded-full flex-shrink-0"
+                onError={(e) => {
+                  // Hide logo if it fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = "none";
+                }}
+              />
+            ) : amountParts.symbol ? (
+              <span>{amountParts.symbol}</span>
+            ) : null}
+            {amountParts.secondary && <span className="text-gray-500 text-[20px]">{amountParts.secondary}</span>}
+          </div>
           <div
             className={
               `mt-2 inline-flex rounded-full px-3 py-1 text-[12px] ` +
@@ -159,20 +468,29 @@ export default function TransactionDetailPage() {
         </div>
 
         <div className="mt-6 space-y-6">
-          {type === "borrow" ? (
-            <CollateralRow
-              assets={[
-                { symbol: "USDT", amount: "20", logo: "/assets/usdt.svg" },
-                { symbol: "USDC", amount: "30", logo: "/assets/usdc.svg" },
-                { symbol: "ETH", amount: "0.003", logo: "/assets/eth.svg" },
-              ]}
+          <Row left="Transaction type" right={type === "borrow" ? "Money borrowed" : type === "repay" ? "Loan repaid" : type === "deposit" ? "Deposit" : "Withdraw"} />
+          {(parsedTx.tokenSymbol || parsedTx.tokenAddress) && (
+            <TokenRow
+              left="Token"
+              tokenSymbol={parsedTx.tokenSymbol}
+              tokenAddress={parsedTx.tokenAddress}
+              tokenLogo={tokenLogo}
             />
-          ) : null}
-          <Row left={type === "borrow" ? "Receiver details" : "Sender details"} right={"Samson Ajewole\nPeak Bank  |  0011223344"} />
-          <Row left="Remark" right={type === "borrow" ? "Loan borrowed" : "Debt cancellation"} />
-          <Row left="Transaction No." right="0146278363678374682947444" />
-          <Row left="Transaction date" right="18 Sep at 12:20PM" />
-          <Row left="Transaction type" right={type === "borrow" ? "Money borrowed" : "Money deposit"} />
+          )}
+          {parsedTx.receiver && (
+            <Row
+              left={type === "borrow" ? "Receiver details" : "Sender details"}
+              right={`${parsedTx.receiver.name}\n${parsedTx.receiver.bankName}  |  ${parsedTx.receiver.accountNumber}`}
+            />
+          )}
+          <Row left="Remark" right={parsedTx.remark} />
+          {parsedTx.transactionNo && <Row left="Transaction No." right={parsedTx.transactionNo} />}
+          <Row left="Transaction Hash" right={formatTransactionHash(parsedTx.transactionHash)} />
+          <div className="flex justify-end">
+            <CopyButton text={parsedTx.transactionHash} label="Copy hash" />
+          </div>
+          <Row left="Transaction date" right={date} />
+          <Row left="Chain" right={parsedTx.walletType} />
         </div>
 
         {/* Watermark overlay (hidden for successful borrows) */}
@@ -196,12 +514,26 @@ export default function TransactionDetailPage() {
         <div className="mx-auto w-full max-w-[560px] bg-white/80 px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 backdrop-blur supports-[backdrop-filter]:bg-white/60">
           {type === "borrow" && status !== "failed" ? (
             <div className="flex items-center gap-2">
-              <Link href={`/repayments/${id}`} className="w-full rounded-[20px] bg-[#2200FF] px-4 py-3 text-[14px] font-medium text-white text-center">Repay loan</Link>
+              <Link href={`/repayments/${id}`} className="w-full rounded-[20px] bg-[#2200FF] px-4 py-3 text-[14px] font-medium text-white text-center">
+                Repay loan
+              </Link>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <button className="w-1/2 rounded-[20px] bg-gray-200 px-4 py-3 text-[14px] font-medium cursor-pointer" onClick={() => setReportOpen(true)}>Report issue</button>
-              <button className="w-1/2 rounded-[20px] bg-[#2200FF] px-4 py-3 text-[14px] font-medium text-white cursor-pointer" onClick={() => setShareOpen(true)}>Share receipt</button>
+              <button
+                type="button"
+                className="w-1/2 rounded-[20px] bg-gray-200 px-4 py-3 text-[14px] font-medium cursor-pointer"
+                onClick={() => setReportOpen(true)}
+              >
+                Report issue
+              </button>
+              <button
+                type="button"
+                className="w-1/2 rounded-[20px] bg-[#2200FF] px-4 py-3 text-[14px] font-medium text-white cursor-pointer"
+                onClick={() => setShareOpen(true)}
+              >
+                Share receipt
+              </button>
             </div>
           )}
         </div>
@@ -214,7 +546,7 @@ export default function TransactionDetailPage() {
             <div>Transaction ID</div>
             <div className="text-right text-gray-900">{id}</div>
             <div>Amount</div>
-            <div className="text-right text-gray-900">{amount}</div>
+            <div className="text-right text-gray-900">{amountString}</div>
             <div>Date</div>
             <div className="text-right text-gray-900">{date}</div>
           </div>
@@ -236,7 +568,6 @@ export default function TransactionDetailPage() {
               type="button"
               className="w-1/2 rounded-lg bg-[#2200FF] px-4 py-2 text-[14px] text-white"
               onClick={() => {
-                // console.log("Report submitted", { id, amount, date, message });
                 setReportOpen(false);
                 setMessage("");
               }}
@@ -251,41 +582,23 @@ export default function TransactionDetailPage() {
         <div className="space-y-3">
           <div className="text-[18px] font-semibold">Share receipt</div>
           <div className="flex flex-col items-stretch gap-2">
-            <button className="w-full rounded-lg bg-gray-200 px-4 py-2 text-[14px] cursor-pointer" onClick={shareAsImage}>Share as image</button>
-            <button className="w-full rounded-lg bg-[#2200FF] px-4 py-2 text-[14px] text-white cursor-pointer" onClick={shareAsPdf}>Share as PDF</button>
+            <button
+              type="button"
+              className="w-full rounded-lg bg-gray-200 px-4 py-2 text-[14px] cursor-pointer"
+              onClick={shareAsImage}
+            >
+              Share as image
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-lg bg-[#2200FF] px-4 py-2 text-[14px] text-white cursor-pointer"
+              onClick={shareAsPdf}
+            >
+              Share as PDF
+            </button>
           </div>
         </div>
       </Modal>
     </div>
   );
 }
-
-function Row({ left, right }: { left: string; right: string }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="text-[14px] font-medium text-gray-500">{left}</div>
-      <div className="text-right text-[14px] whitespace-pre-line">{right}</div>
-    </div>
-  );
-}
-
-function CollateralRow({ assets }: { assets: { symbol: string; amount: string; logo: string }[] }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="text-[14px] font-medium text-gray-500">Collateralized assets</div>
-      <div className="flex flex-wrap justify-end gap-2">
-        {assets.map((a) => (
-          <span key={`${a.symbol}-${a.amount}`} className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-1 text-[12px] text-gray-800">
-            <Image src={a.logo} alt={a.symbol} width={16} height={16} className="rounded-full" />
-            <span>
-              {a.amount}
-              {a.symbol}
-            </span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-

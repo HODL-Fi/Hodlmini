@@ -4,6 +4,9 @@ import React from "react";
 import Image from "next/image";
 import BorrowTopNav from "@/components/BorrowTopNav";
 import Modal from "@/components/ui/Modal";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { generateHandleFromUserId } from "@/utils/username";
+import useGetUserProfile from "@/hooks/user/useGetUserProfile";
 
 export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
@@ -19,12 +22,48 @@ export default function ProfilePage() {
   ]), []);
   const [selectedAvatarKey, setSelectedAvatarKey] = React.useState<string>(AVATARS[0]?.key ?? "capricorn");
 
-  const [fullName, setFullName] = React.useState("Jasper Jed");
-  const [email, setEmail] = React.useState("jasperjed@mail.xyz");
-  const [phone, setPhone] = React.useState("0801 234 5544");
+  const { userId } = useAuthStore();
+  const { data: profile, isLoading } = useGetUserProfile();
 
-  const [initial] = React.useState({ fullName: "Jasper Jed", email: "jasperjed@mail.xyz", phone: "0801 234 5544" });
-  const dirty = fullName !== initial.fullName || email !== initial.email || phone !== initial.phone || Boolean(avatarUrl);
+  // Generate fallback username from userId
+  const fallbackUsername = React.useMemo(() => {
+    if (!userId) return "";
+    return generateHandleFromUserId(userId, "shortHex");
+  }, [userId]);
+
+  // Use API username if available, otherwise use generated one
+  const displayUsername = profile?.username ?? fallbackUsername;
+  const isKycVerified = profile?.kycStatus === "VERIFIED" && profile?.name;
+
+  const [fullName, setFullName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [userName, setUserName] = React.useState("");
+
+  // Track initial values after data loads
+  const [initial, setInitial] = React.useState({ fullName: "", email: "", userName: "" });
+
+  // Update fields when profile data loads
+  React.useEffect(() => {
+    if (profile) {
+      const profileEmail = profile.email || "";
+      const profileName = (isKycVerified && profile.name) ? profile.name : "";
+      const profileUsername = displayUsername;
+
+      // Set current values
+      setEmail(profileEmail);
+      setFullName(profileName);
+      setUserName(profileUsername);
+
+      // Set initial values for dirty check
+      setInitial({
+        fullName: profileName,
+        email: profileEmail,
+        userName: profileUsername,
+      });
+    }
+  }, [profile, displayUsername, isKycVerified]);
+
+  const dirty = fullName !== initial.fullName || userName !== initial.userName || Boolean(avatarUrl);
 
   function onSelectAvatar(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -58,28 +97,34 @@ export default function ProfilePage() {
         </section>
 
         <section className="mx-auto mt-6 max-w-[560px] space-y-5">
-          <div>
-            <div className="text-[14px] text-gray-600">Full name</div>
-            <input
-              value={fullName}
-              onChange={(e)=>setFullName(e.target.value)}
-              className="mt-2 w-full rounded-[14px] border border-gray-200 bg-white px-3 py-3 text-[16px] outline-none"
-            />
-          </div>
+          {isKycVerified && (
+            <div>
+              <div className="text-[14px] text-gray-600">Full name</div>
+              <input
+                value={fullName}
+                onChange={(e)=>setFullName(e.target.value)}
+                className="mt-2 w-full rounded-[14px] border border-gray-200 bg-white px-3 py-3 text-[16px] outline-none"
+                placeholder={isLoading ? "Loading..." : ""}
+              />
+            </div>
+          )}
           <div>
             <div className="text-[14px] text-gray-600">Email</div>
             <input
               value={email}
-              onChange={(e)=>setEmail(e.target.value)}
-              className="mt-2 w-full rounded-[14px] border border-gray-200 bg-gray-50 px-3 py-3 text-[16px] outline-none"
+              className="mt-2 w-full rounded-[14px] border border-gray-200 bg-gray-50 px-3 py-3 text-[16px] outline-none cursor-not-allowed"
+              readOnly
+              disabled
+              placeholder={isLoading ? "Loading..." : ""}
             />
           </div>
           <div>
-            <div className="text-[14px] text-gray-600">Phone number</div>
+            <div className="text-[14px] text-gray-600">Username</div>
             <input
-              value={phone}
-              onChange={(e)=>setPhone(e.target.value)}
+              value={userName}
+              onChange={(e)=>setUserName(e.target.value)}
               className="mt-2 w-full rounded-[14px] border border-gray-200 bg-white px-3 py-3 text-[16px] outline-none"
+              placeholder={isLoading ? "Loading..." : ""}
             />
           </div>
         </section>

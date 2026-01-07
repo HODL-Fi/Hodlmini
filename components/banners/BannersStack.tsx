@@ -28,7 +28,7 @@ export default function BannersStack({ className }: BannersStackProps) {
     {
       key: "convert",
       title: "Convert instantly",
-      description: "Swap assets with zero friction and transparent quotes",
+      description: "Swap assets on multiple chains with zero friction and transparent quotes",
       cta: "Convert now",
       icon: "/icons/convert.svg",
       bg: "bg-[#F1F5FF]",

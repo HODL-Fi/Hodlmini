@@ -8,6 +8,7 @@ import LogoutModal from "@/components/settings/LogoutModal";
 import FontSettingsModal from "@/components/settings/FontSettingsModal";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
+import useGetUserProfile from "@/hooks/user/useGetUserProfile";
 
 type Item = {
   key: string;
@@ -22,7 +23,17 @@ export default function SettingsPage() {
   const router = useRouter();
   const [logoutOpen, setLogoutOpen] = React.useState(false);
   const [fontSettingsOpen, setFontSettingsOpen] = React.useState(false);
-  const userEmail = "jasperjed@mail.xyz";
+  const { data: profile } = useGetUserProfile();
+  const userEmail = profile?.email || "jasperjed@mail.xyz";
+  
+  // Determine verification status
+  // User is verified if they have any tier status (tier_1, tier_2, tier_3, or VERIFIED)
+  const isVerified = profile?.kycStatus && (profile.kycStatus === "VERIFIED" || profile.kycStatus.startsWith("tier_"));
+  const verificationBadge = isVerified ? (
+    <span className="rounded-full bg-green-100 px-2.5 py-1 text-[11px] font-medium text-green-700">Verified</span>
+  ) : (
+    <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-[11px] font-medium text-yellow-700">Not Verified</span>
+  );
   const [delEmailOpen, setDelEmailOpen] = React.useState(false);
   const [delSureOpen, setDelSureOpen] = React.useState(false);
   const [delCountdownOpen, setDelCountdownOpen] = React.useState(false);
@@ -40,16 +51,14 @@ export default function SettingsPage() {
   }, [navigateHome, router]);
   const items: Item[] = [
     { key: "profile", label: "Profile", icon: "/settings/profile.svg", href: "/settings/profile" },
-    { key: "password", label: "Change password", icon: "/settings/key.svg", href: "/settings/password" },
+    // { key: "password", label: "Change password", icon: "/settings/key.svg", href: "/settings/password" },
     { key: "referral", label: "Referral", icon: "/settings/refer.svg", href: "/settings/referral" },
     {
       key: "verifications",
       label: "Verifications",
       icon: "/settings/document.svg",
       href: "/settings/verification",
-      right: (
-        <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-[11px] font-medium text-yellow-700">Pending</span>
-      ),
+      right: verificationBadge,
     },
     { key: "linked", label: "Linked accounts", icon: "/settings/building-library.svg", href: "/settings/linked" },
     { key: "notif", label: "Notification settings", icon: "/settings/bell.svg", href: "/settings/notifications" },

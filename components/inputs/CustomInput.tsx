@@ -39,10 +39,43 @@ export default function CustomInput({ value, onChange, placeholder = "0", disabl
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value.replace(",", ".");
-    if (/^\d*(?:\.\d*)?$/.test(raw) || raw === "") {
-      onChange(raw);
+    const input = e.target.value;
+    // Allow user to type commas, but validate against a plain numeric pattern
+    const sanitized = input.replace(/,/g, "");
+
+    // Allow "1", "1.", "1.0", "" etc.
+    if (!/^\d*(?:\.\d*)?$/.test(sanitized) && sanitized !== "") {
+      return;
     }
+
+    // For empty string or just ".", pass through as-is
+    if (sanitized === "" || sanitized === ".") {
+      onChange(input);
+      return;
+    }
+
+    // If user is still typing trailing dot, don't format yet
+    if (input.endsWith(".") && sanitized.indexOf(".") === sanitized.length - 1) {
+      onChange(input);
+      return;
+    }
+
+    const n = Number(sanitized);
+    if (!Number.isFinite(n)) {
+      onChange(input);
+      return;
+    }
+
+    const [, frac = ""] = sanitized.split(".");
+    const fracLen = frac.length;
+
+    const formatter = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: fracLen,
+      maximumFractionDigits: fracLen,
+    });
+
+    const formatted = formatter.format(n);
+    onChange(formatted);
   }
 
   return (

@@ -12,6 +12,18 @@ import BorrowSuccessModal from "@/components/borrow/BorrowSuccessModal";
 import BorrowFailedModal from "@/components/borrow/BorrowFailedModal";
 import BankSelectModal, { type BankAccount } from "@/components/borrow/BankSelectModal";
 import HealthBar from "@/components/HeathBar";
+import { useGetAllChainBalances } from "@/hooks/wallet/useGetTokenWalletBalance";
+import { useDepositCollateral } from "@/hooks/vault/useDepositCollateral";
+import { useBorrow, type BorrowRequest } from "@/hooks/vault/useBorrow";
+import useGetCollateralPosition, { type CollateralPosition } from "@/hooks/vault/useGetCollateralPosition";
+import useGetAccountValue from "@/hooks/vault/useGetAccountValue";
+import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
+import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
+import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
+import { CHAIN_IDS } from "@/utils/constants/chainIds";
+import { CNGN_BASE_ADDRESS, CNGN_DECIMALS } from "@/utils/constants/cngn";
+import { useNgnConversion } from "@/hooks/useNgnConversion";
+import { getTokenDecimals } from "@/utils/constants/tokenDecimals";
 
 export default function BorrowPage() {
   return (
@@ -28,24 +40,23 @@ function BorrowPageInner() {
   React.useEffect(() => setMounted(true), []);
   const modeParam = searchParams?.get("mode") ?? undefined; // existing | new
   const isExistingMode = modeParam === "existing";
-  const borrowResultParam = (searchParams?.get("borrowResult") ?? "success").toLowerCase(); // success|fail
-  const simEnabled = searchParams?.get("sim") === "1";
   const assets = React.useMemo(() => ([
-    // Defaults for demo; can be tuned per asset
-    { symbol: "ETH",  name: "Ethereum",      icon: "/assets/eth.svg",  priceUsd: 3500,     balance: 4.0,  collateralFactor: 0.7, liquidationThreshold: 0.8 },
-    { symbol: "WETH", name: "Wrapped ETH",   icon: "/assets/weth.svg", priceUsd: 3500,     balance: 0,    collateralFactor: 0.7, liquidationThreshold: 0.8 },
-    { symbol: "DAI",  name: "DAI",           icon: "/assets/dai.svg",  priceUsd: 1,        balance: 0,    collateralFactor: 0.8, liquidationThreshold: 0.85 },
-    { symbol: "cNGN", name: "compliant NGN", icon: "/assets/cngn.svg", priceUsd: 1/1500,   balance: 0,    collateralFactor: 0.6, liquidationThreshold: 0.7 },
-    { symbol: "WKC",  name: "Wikicat",       icon: "/assets/wkc.svg",  priceUsd: 0.000001, balance: 0,    collateralFactor: 0.2, liquidationThreshold: 0.3 },
-    { symbol: "USDT", name: "Tether",        icon: "/assets/usdt.svg", priceUsd: 1,        balance: 12000,collateralFactor: 0.8, liquidationThreshold: 0.85 },
-    { symbol: "USDC", name: "USD Coin",      icon: "/assets/usdc.svg", priceUsd: 1,        balance: 8800, collateralFactor: 0.85,liquidationThreshold: 0.9 },
-    { symbol: "BNB",  name: "BNB",           icon: "/assets/bnb.svg",  priceUsd: 600,      balance: 9.3,  collateralFactor: 0.6, liquidationThreshold: 0.7 },
+    // Static metadata only; all financial values come from live data elsewhere.
+    { symbol: "ETH",  name: "Ethereum",      icon: "/assets/eth.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    { symbol: "WETH", name: "Wrapped ETH",   icon: "/assets/weth.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    { symbol: "DAI",  name: "DAI",           icon: "/assets/dai.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    { symbol: "cNGN", name: "compliant NGN", icon: "/assets/cngn.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    { symbol: "WKC",  name: "Wikicat",       icon: "/assets/wkc.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    { symbol: "USDT", name: "Tether",        icon: "/assets/usdt.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    { symbol: "USDC", name: "USD Coin",      icon: "/assets/usdc.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    { symbol: "BNB",  name: "BNB",           icon: "/assets/bnb.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
   ]), []);
   const fiats = React.useMemo(() => ([
-    { code: "NGN", name: "Nigerian Naira", icon: "/fiat/ngn.svg", usdToFiat: 1500 },
-    { code: "GHC", name: "Ghanian Cedi", icon: "/fiat/ghs.svg", usdToFiat: 15 },
-    { code: "KHS", name: "Kenyan Shillings", icon: "/fiat/khs.svg", usdToFiat: 130 },
-    { code: "ZAR", name: "South African Rand", icon: "/fiat/zar.svg", usdToFiat: 18 },
+    { code: "NGN",  name: "Nigerian Naira",            icon: "/fiat/ngn.svg" },
+    { code: "GHC",  name: "Ghanian Cedi",              icon: "/fiat/ghs.svg" },
+    { code: "KHS",  name: "Kenyan Shillings",          icon: "/fiat/khs.svg" },
+    { code: "ZAR",  name: "South African Rand",        icon: "/fiat/zar.svg" },
+    { code: "cNGN", name: "compliant NGN (on-chain)",  icon: "/assets/cngn.svg" },
   ]), []);
 
   const [collateralLines, setCollateralLines] = React.useState<{ symbol: string; amount: string }[]>([
@@ -73,15 +84,7 @@ function BorrowPageInner() {
   const listRef = React.useRef<HTMLDivElement>(null);
   const [showTopShadow, setShowTopShadow] = React.useState(false);
   const [showBottomShadow, setShowBottomShadow] = React.useState(false);
-
-  // Simulated existing portfolio positions when using URL flag sim=1
-  const existingPositions = React.useMemo(() => {
-    if (!simEnabled) return [] as { symbol: string; amount: number }[];
-    return [
-      { symbol: "ETH", amount: 1.25 },
-      { symbol: "USDT", amount: 4500 },
-    ];
-  }, [simEnabled]);
+  const [isProcessingBorrow, setIsProcessingBorrow] = React.useState(false);
 
   // Tenure & rates
   const TENURES = React.useMemo(() => [7, 30, 60, 90, 365], []);
@@ -89,13 +92,370 @@ function BorrowPageInner() {
   const BASE_DAILY_RATE = 0.0005; // 0.05% per day
   const OVERDUE_DAILY_RATE = 0.00025; // 0.025% per day after tenure
 
-  const LTV = 0.7;
+  // Removed hardcoded LTV - all collateral factors should come from API
+
+  const isCngnOnchain = selectedFiat.code === "cNGN";
+
+  const chainList = React.useMemo(() => Object.values(CHAIN_IDS), []);
+  const { data: balancesByChain } = useGetAllChainBalances(chainList);
+  const collateralPosition = useGetCollateralPosition(chainList);
+  const accountValue = useGetAccountValue(chainList);
+  const { mutateAsync: depositCollateral } = useDepositCollateral();
+  const { mutateAsync: borrow } = useBorrow();
+  const { usdToNgnRate, cngnPrice } = useNgnConversion();
+
+  // Normalize account metric (handle 1e18 scaling)
+  function normalizeAccountMetric(raw: number | string | undefined): number {
+    const n = Number(raw) || 0;
+    if (!Number.isFinite(n)) return 0;
+    // Heuristic: if the value looks like a 1e18-scaled integer, normalise it.
+    if (n > 1e12) {
+      return n / 1e18;
+    }
+    return n;
+  }
+
+  // Get existing debt in USD (sum across all chains)
+  const existingDebtUsd = React.useMemo(() => {
+    if (!accountValue.data) return 0;
+    let totalDebt = 0;
+    Object.values(accountValue.data).forEach((value) => {
+      totalDebt += normalizeAccountMetric(value.debtValue);
+    });
+    return totalDebt;
+  }, [accountValue.data]);
+
+  // DEXTools price tokens derived from wallet balances
+  const priceTokens = React.useMemo(() => {
+    if (!balancesByChain) return [];
+
+    const seen = new Set<string>();
+    const tokens: { chain: ReturnType<typeof mapHexChainIdToDextools>; address: string }[] = [];
+
+    Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
+      const dextoolsChain = mapHexChainIdToDextools(hexChainId);
+      if (!dextoolsChain) return;
+
+      chainBalances.forEach((token) => {
+        let addr = token.contractAddress;
+
+        const isEthNative =
+          token.symbol.toUpperCase() === "ETH" &&
+          (!addr ||
+            addr === "N/A" ||
+            addr === "0x0000000000000000000000000000000000000001");
+
+        if (isEthNative) {
+          const wethAddr = getWethAddressForChain(hexChainId);
+          if (wethAddr) {
+            addr = wethAddr;
+          } else {
+            return;
+          }
+        } else if (!addr || addr === "N/A") {
+          return;
+        }
+
+        const key = makeDextoolsPriceKey(dextoolsChain, addr);
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        tokens.push({ chain: dextoolsChain, address: addr });
+      });
+    });
+
+    return tokens;
+  }, [balancesByChain]);
+
+  const { data: tokenPrices } = useTokenPrices(priceTokens as any);
+
+  // Whitelist of valid collateral token addresses (from backend)
+  const collateralWhitelist = React.useMemo(() => {
+    if (!collateralPosition.data) return null;
+    const set = new Set<string>();
+    Object.values(collateralPosition.data).forEach((list) => {
+      (list || []).forEach((asset: CollateralPosition) => {
+        const cfNum = Number(asset.cf) || 0;
+        if (cfNum <= 0) return;
+        const addr = String(asset.address || "").toLowerCase();
+        if (!addr) return;
+        set.add(addr);
+      });
+    });
+    return set;
+  }, [collateralPosition.data]);
+
+  // Map of symbol -> collateral factor (fraction, e.g. 0.7 for 70%)
+  const cfBySymbol = React.useMemo(() => {
+    const map = new Map<string, number>();
+    if (!collateralPosition.data) return map;
+
+    Object.values(collateralPosition.data).forEach((list) => {
+      (list || []).forEach((asset: CollateralPosition) => {
+        const cfNum = Number(asset.cf) || 0;
+        if (cfNum <= 0) return;
+        const sym = asset.symbol?.toUpperCase();
+        if (!sym) return;
+        const cfFraction = cfNum / 10_000; // bps -> fraction
+        const prev = map.get(sym);
+        // Keep the highest CF we see for this symbol across chains
+        if (prev == null || cfFraction > prev) {
+          map.set(sym, cfFraction);
+        }
+      });
+    });
+
+    return map;
+  }, [collateralPosition.data]);
+
+  // Backend existing positions (normalize by decimals and aggregate per symbol)
+  const backendExistingPositions = React.useMemo(() => {
+    if (!collateralPosition.data) return [] as { symbol: string; amount: number }[];
+
+    const bySymbol = new Map<string, number>();
+    Object.values(collateralPosition.data).forEach((list) => {
+      (list || []).forEach((asset: CollateralPosition) => {
+        const raw = Number(asset.amount);
+        const decimals = getTokenDecimals((asset as any).decimals, asset.symbol, String(asset.address || ""));
+        if (!Number.isFinite(raw) || raw <= 0) return;
+        const denom = 10 ** decimals;
+        const amt = raw / denom;
+        if (amt <= 0) return;
+        const sym = asset.symbol?.toUpperCase();
+        if (!sym) return;
+        const prev = bySymbol.get(sym) ?? 0;
+        bySymbol.set(sym, prev + amt);
+      });
+    });
+
+    return Array.from(bySymbol.entries()).map(([symbol, amount]) => ({ symbol, amount }));
+  }, [collateralPosition.data]);
+
+  const hasBackendCollateral = backendExistingPositions.length > 0;
+
+  // Prefer backend positions as existing portfolio
+  const existingPositions = React.useMemo(
+    () => backendExistingPositions,
+    [backendExistingPositions]
+  );
+
+  // If user already has collateral and no explicit mode is set, default to existing mode
+  React.useEffect(() => {
+    if (!mounted) return;
+    if (modeParam) return;
+    if (!hasBackendCollateral) return;
+
+    const sp = new URLSearchParams(searchParams?.toString() ?? "");
+    sp.set("mode", "existing");
+    router.replace(`/borrow?${sp.toString()}`);
+  }, [mounted, modeParam, hasBackendCollateral, router, searchParams]);
+
+  // Symbols that are both in the wallet (balance > 0) and whitelisted as collateral
+  const availableCollateralSymbols = React.useMemo(() => {
+    const set = new Set<string>();
+    if (!balancesByChain) return set;
+
+    Object.entries(balancesByChain).forEach(([_, chainBalances]) => {
+      chainBalances.forEach((token) => {
+        const amount = Number(token.balance) || 0;
+        if (amount <= 0) return;
+
+        let whitelistAddress = (token.contractAddress || "").toLowerCase();
+        const isEthNativeForWhitelist =
+          token.symbol.toUpperCase() === "ETH" &&
+          (!whitelistAddress ||
+            whitelistAddress === "n/a" ||
+            whitelistAddress === "0x0000000000000000000000000000000000000001");
+        if (isEthNativeForWhitelist) {
+          // Backend uses this sentinel address for native ETH collateral
+          whitelistAddress = "0x0000000000000000000000000000000000000001";
+        }
+
+        if (
+          collateralWhitelist &&
+          (!whitelistAddress || !collateralWhitelist.has(whitelistAddress))
+        ) {
+          return;
+        }
+
+        set.add(token.symbol.toUpperCase());
+      });
+    });
+
+    return set;
+  }, [balancesByChain, collateralWhitelist]);
+
+  // Parse usdValue from API (handles scientific notation like "9.9979195e+26")
+  const parseUsdValue = (usdValue: string | number | undefined): number => {
+    if (usdValue == null) return 0;
+    const str = String(usdValue).trim();
+    if (!str || str === "0") return 0;
+    const num = Number(str);
+    return Number.isFinite(num) && num > 0 ? num : 0;
+  };
+
+  // Price per token from API (usdValue / normalizedAmount)
+  const priceBySymbolFromApi = React.useMemo(() => {
+    const priceMap = new Map<string, number>();
+    
+    if (!collateralPosition.data) return priceMap;
+    
+    Object.values(collateralPosition.data).forEach((list) => {
+      (list || []).forEach((asset: CollateralPosition) => {
+        const raw = Number(asset.amount);
+        if (!Number.isFinite(raw) || raw <= 0) return;
+        
+        const decimals = getTokenDecimals((asset as any).decimals, asset.symbol, String(asset.address || ""));
+        const denom = 10 ** decimals;
+        const normalizedAmount = raw / denom;
+        if (normalizedAmount <= 0) return;
+        
+        // Get USD value from API
+        const rawUsdValue = parseUsdValue(asset.usdValue);
+        if (rawUsdValue <= 0) return;
+        
+        // usdValue appears to be: amount * price * 1e18 (where amount is in smallest units, price is per token)
+        // To get price per token: price = usdValue / (amount * 1e18)
+        // Since amount = raw (in smallest units), and normalizedAmount = raw / 10^decimals:
+        // price = usdValue / (raw * 1e18) = usdValue / ((normalizedAmount * 10^decimals) * 1e18)
+        // price = usdValue / (normalizedAmount * 10^decimals * 1e18)
+        let pricePerToken = 0;
+        if (rawUsdValue > 1e12) {
+          // If very large, it's likely scaled by 1e18
+          // price = usdValue / (amount * 1e18) = usdValue / (normalizedAmount * 10^decimals * 1e18)
+          pricePerToken = rawUsdValue / (normalizedAmount * denom * 1e18);
+        } else {
+          // If not scaled, usdValue is already the total USD value
+          pricePerToken = rawUsdValue / normalizedAmount;
+        }
+        
+        // Sanity check: price should be reasonable (between $0.0001 and $1,000,000)
+        if (pricePerToken > 0 && pricePerToken >= 0.0001 && pricePerToken <= 1000000) {
+          const sym = asset.symbol?.toUpperCase();
+          if (sym) {
+            // If multiple positions for same symbol, use the average or latest (for now, overwrite)
+            priceMap.set(sym, pricePerToken);
+          }
+        }
+      });
+    });
+    
+    return priceMap;
+  }, [collateralPosition.data, parseUsdValue]);
+
+  // Per-symbol wallet balances and USD prices (from API first, then DEXTools fallback)
+  const { balanceBySymbol, priceBySymbol } = React.useMemo(() => {
+    const balances = new Map<string, number>();
+    const usdSums = new Map<string, number>();
+
+    if (!balancesByChain) {
+      return { balanceBySymbol: balances, priceBySymbol: priceBySymbolFromApi };
+    }
+
+    Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
+      chainBalances.forEach((token) => {
+        const amount = Number(token.balance) || 0;
+        if (!amount || amount <= 0) return;
+
+        const sym = token.symbol.toUpperCase();
+        const prevBal = balances.get(sym) ?? 0;
+        balances.set(sym, prevBal + amount);
+        
+        // Use API price if available, otherwise try DEXTools
+        const apiPrice = priceBySymbolFromApi.get(sym);
+        if (apiPrice && apiPrice > 0) {
+          const prevUsd = usdSums.get(sym) ?? 0;
+          usdSums.set(sym, prevUsd + amount * apiPrice);
+        } else if (tokenPrices) {
+          const dextoolsChain = mapHexChainIdToDextools(hexChainId);
+          if (!dextoolsChain) return;
+
+          let priceAddress = token.contractAddress;
+
+          const isEthNative =
+            token.symbol.toUpperCase() === "ETH" &&
+            (!priceAddress ||
+              priceAddress === "N/A" ||
+              priceAddress === "0x0000000000000000000000000000000000000001");
+
+          if (isEthNative) {
+            const wethAddr = getWethAddressForChain(hexChainId);
+            if (wethAddr) {
+              priceAddress = wethAddr;
+            } else {
+              return;
+            }
+          } else if (!priceAddress || priceAddress === "N/A") {
+            return;
+          }
+
+          const priceKey = makeDextoolsPriceKey(dextoolsChain, priceAddress);
+          const p = (tokenPrices as any)[priceKey];
+          const price = p?.price ?? 0;
+          if (price > 0) {
+            const prevUsd = usdSums.get(sym) ?? 0;
+            usdSums.set(sym, prevUsd + amount * price);
+          }
+        }
+      });
+    });
+
+    // Build final price map: API prices take priority, then calculated from DEXTools
+    const prices = new Map<string, number>(priceBySymbolFromApi);
+    usdSums.forEach((usd, sym) => {
+      const bal = balances.get(sym) ?? 0;
+      if (bal > 0 && !prices.has(sym)) {
+        // Only use DEXTools price if API price not available
+        prices.set(sym, usd / bal);
+      }
+    });
+
+    return { balanceBySymbol: balances, priceBySymbol: prices };
+  }, [balancesByChain, tokenPrices, priceBySymbolFromApi]);
+
+  function toSmallestUnits(amountStr: string, decimals: number): string {
+    const cleaned = (amountStr || "").replace(/,/g, "").trim();
+    if (!cleaned) return "0";
+    const negative = cleaned.startsWith("-");
+    const unsigned = negative ? cleaned.slice(1) : cleaned;
+    const [wholePartRaw, fracPartRaw = ""] = unsigned.split(".");
+    const wholePart = wholePartRaw.replace(/^0+/, "") || "0";
+    const fracPart = fracPartRaw.slice(0, decimals).padEnd(decimals, "0");
+    const combined = `${wholePart}${fracPart}`.replace(/^0+/, "") || "0";
+    return negative ? `-${combined}` : combined;
+  }
+
+  function resolveCollateralToken(symbol: string) {
+    if (!balancesByChain) return null;
+    const upper = symbol.toUpperCase();
+    for (const [chainId, chainBalances] of Object.entries(balancesByChain)) {
+      const match = chainBalances.find(
+        (t) =>
+          t.symbol?.toUpperCase() === upper &&
+          t.contractAddress &&
+          t.contractAddress !== "N/A"
+      );
+      if (match) {
+        return {
+          tokenAddress: match.contractAddress.toLowerCase(),
+          chainIdHex: chainId,
+          decimals: match.decimals ?? 18,
+        };
+      }
+    }
+    return null;
+  }
 
   function formatNumber(n: number, fractionDigits = 2) {
     return new Intl.NumberFormat("en-US", { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }).format(n);
   }
 
   function formatFiat(code: string, amount: number) {
+    // cNGN is an on-chain token, show it as "123,456.00 cNGN" instead of a fiat symbol.
+    if (code === "cNGN") {
+      return `${formatNumber(amount)} cNGN`;
+    }
+
     // Simple symbol mapping; extend as needed
     const symbols: Record<string, string> = { NGN: "₦", ZAR: "R", GHC: "₵", KHS: "KSh" };
     const prefix = symbols[code] ?? "";
@@ -111,46 +471,167 @@ function BorrowPageInner() {
   function handleMaxCollateral(rowIndex: number) {
     setCollateralLines((prev) => {
       const next = [...prev];
-      const asset = assets.find((a) => a.symbol === next[rowIndex].symbol)!;
-      next[rowIndex] = { ...next[rowIndex], amount: String(asset.balance) };
+      const sym = next[rowIndex].symbol.toUpperCase();
+      const bal = balanceBySymbol.get(sym) ?? 0;
+      next[rowIndex] = { ...next[rowIndex], amount: bal ? String(bal) : "" };
       return next;
     });
   }
 
   function handleMaxReceive() {
-    const maxUsd = isExistingMode
-      ? existingPositions.reduce((sum, pos) => {
-          const asset = assets.find((a) => a.symbol === pos.symbol);
-          if (!asset || !isFinite(pos.amount) || pos.amount <= 0) return sum;
-          return sum + pos.amount * asset.priceUsd * (asset.collateralFactor ?? LTV);
-        }, 0)
-      : collateralLines.reduce((sum, line) => {
-          const asset = assets.find((a) => a.symbol === line.symbol);
-          const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
-          if (!asset || !isFinite(amt) || amt <= 0) return sum;
-          return sum + amt * asset.priceUsd * (asset.collateralFactor ?? LTV);
-        }, 0);
-    const maxFiat = maxUsd * selectedFiat.usdToFiat;
-    setFiatReceive(maxFiat > 0 ? formatNumber(maxFiat) : "");
+    // Use maxLendForCollateral which already accounts for existing debt
+    setFiatReceive(maxLendForCollateral > 0 ? formatNumber(maxLendForCollateral) : "");
   }
 
   // keep receive independent; no auto-overwrite on collateral/asset/fiat changes
 
+  // Calculate total collateral capacity (existing + new) in USD
+  const totalCollateralCapacityUsd = React.useMemo(() => {
+    let capacity = 0;
+
+    // Add existing positions capacity
+    if (isExistingMode || existingPositions.length > 0) {
+      capacity += existingPositions.reduce((sum, pos) => {
+        const sym = pos.symbol.toUpperCase();
+        const price = priceBySymbol.get(sym) ?? 0;
+        const cf = cfBySymbol.get(sym);
+        // Only include if we have collateral factor from API
+        if (cf === undefined || cf <= 0) return sum;
+        const amt = pos.amount;
+        if (!isFinite(amt) || amt <= 0 || price <= 0) return sum;
+        return sum + amt * price * cf;
+      }, 0);
+    }
+
+    // Add new collateral capacity (if in new mode or adding new collateral)
+    if (!isExistingMode) {
+      capacity += collateralLines.reduce((sum, line) => {
+        const sym = line.symbol.toUpperCase();
+        const price = priceBySymbol.get(sym) ?? 0;
+        const cf = cfBySymbol.get(sym);
+        // Only include if we have collateral factor from API
+        if (cf === undefined || cf <= 0) return sum;
+        const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
+        if (!isFinite(amt) || amt <= 0 || price <= 0) return sum;
+        return sum + amt * price * cf;
+      }, 0);
+    }
+
+    return capacity;
+  }, [collateralLines, isExistingMode, existingPositions, priceBySymbol, cfBySymbol]);
+
+  // Convert existing debt to selected fiat currency
+  const existingDebtInFiat = React.useMemo(() => {
+    if (existingDebtUsd <= 0) return 0;
+
+    if (selectedFiat.code === "cNGN") {
+      if (cngnPrice > 0) {
+        return existingDebtUsd / cngnPrice;
+      }
+      return existingDebtUsd;
+    }
+
+    if (selectedFiat.code === "NGN") {
+      if (usdToNgnRate > 0) {
+        return existingDebtUsd * usdToNgnRate;
+      }
+      return existingDebtUsd;
+    }
+
+    // Other fiats currently treated as USD 1:1
+    return existingDebtUsd;
+  }, [existingDebtUsd, selectedFiat.code, cngnPrice, usdToNgnRate]);
+
+  // Max lending amount = total capacity - existing debt
   const maxLendForCollateral = React.useMemo(() => {
-    const totalUsdCapacity = isExistingMode
-      ? existingPositions.reduce((sum, pos) => {
-          const asset = assets.find((a) => a.symbol === pos.symbol);
-          if (!asset || !isFinite(pos.amount) || pos.amount <= 0) return sum;
-          return sum + pos.amount * asset.priceUsd * (asset.collateralFactor ?? LTV);
-        }, 0)
-      : collateralLines.reduce((sum, line) => {
-          const asset = assets.find((a) => a.symbol === line.symbol);
-          const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
-          if (!asset || !isFinite(amt) || amt <= 0) return sum;
-          return sum + amt * asset.priceUsd * (asset.collateralFactor ?? LTV);
-        }, 0);
-    return totalUsdCapacity * selectedFiat.usdToFiat;
-  }, [collateralLines, assets, selectedFiat, isExistingMode, existingPositions]);
+    if (!isFinite(totalCollateralCapacityUsd) || totalCollateralCapacityUsd <= 0) {
+      return 0;
+    }
+
+    // Convert total capacity to selected fiat
+    let maxCapacityInFiat = totalCollateralCapacityUsd;
+
+    if (selectedFiat.code === "cNGN") {
+      if (cngnPrice > 0) {
+        maxCapacityInFiat = totalCollateralCapacityUsd / cngnPrice;
+      }
+    } else if (selectedFiat.code === "NGN") {
+      if (usdToNgnRate > 0) {
+        maxCapacityInFiat = totalCollateralCapacityUsd * usdToNgnRate;
+      }
+    }
+
+    // Subtract existing debt
+    const available = maxCapacityInFiat - existingDebtInFiat;
+    return Math.max(0, available);
+  }, [totalCollateralCapacityUsd, existingDebtInFiat, selectedFiat.code, cngnPrice, usdToNgnRate]);
+
+  // Max capacity in selected fiat (before subtracting debt) - for display
+  const maxCapacityInFiat = React.useMemo(() => {
+    if (!isFinite(totalCollateralCapacityUsd) || totalCollateralCapacityUsd <= 0) {
+      return 0;
+    }
+
+    if (selectedFiat.code === "cNGN") {
+      if (cngnPrice > 0) {
+        return totalCollateralCapacityUsd / cngnPrice;
+      }
+      return totalCollateralCapacityUsd;
+    }
+
+    if (selectedFiat.code === "NGN") {
+      if (usdToNgnRate > 0) {
+        return totalCollateralCapacityUsd * usdToNgnRate;
+      }
+      return totalCollateralCapacityUsd;
+    }
+
+    return totalCollateralCapacityUsd;
+  }, [totalCollateralCapacityUsd, selectedFiat.code, cngnPrice, usdToNgnRate]);
+
+  // Effective portfolio LTV cap (value-weighted CF across all collateral)
+  const effectiveLtv = React.useMemo(() => {
+    const { totalValueUsd, capacityUsd } = isExistingMode
+      ? existingPositions.reduce(
+          (acc, pos) => {
+            const sym = pos.symbol.toUpperCase();
+            const price = priceBySymbol.get(sym) ?? 0;
+            const cf = cfBySymbol.get(sym);
+            // Only include if we have collateral factor from API
+            if (cf === undefined || cf <= 0) return acc;
+            const amt = pos.amount;
+            if (!isFinite(amt) || amt <= 0 || price <= 0) return acc;
+            const val = amt * price;
+            return {
+              totalValueUsd: acc.totalValueUsd + val,
+              capacityUsd: acc.capacityUsd + val * cf,
+            };
+          },
+          { totalValueUsd: 0, capacityUsd: 0 }
+        )
+      : collateralLines.reduce(
+          (acc, line) => {
+            const sym = line.symbol.toUpperCase();
+            const price = priceBySymbol.get(sym) ?? 0;
+            const cf = cfBySymbol.get(sym);
+            // Only include if we have collateral factor from API
+            if (cf === undefined || cf <= 0) return acc;
+            const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
+            if (!isFinite(amt) || amt <= 0 || price <= 0) return acc;
+            const val = amt * price;
+            return {
+              totalValueUsd: acc.totalValueUsd + val,
+              capacityUsd: acc.capacityUsd + val * cf,
+            };
+          },
+          { totalValueUsd: 0, capacityUsd: 0 }
+        );
+
+    if (!isFinite(totalValueUsd) || totalValueUsd <= 0 || !isFinite(capacityUsd) || capacityUsd <= 0) {
+      return 0; // Return 0 if no valid collateral instead of hardcoded value
+    }
+    return Math.max(0, Math.min(1, capacityUsd / totalValueUsd));
+  }, [isExistingMode, existingPositions, collateralLines, priceBySymbol, cfBySymbol]);
 
   const receiveNumeric = React.useMemo(() => parseFloat((fiatReceive || "").replace(/,/g, "")), [fiatReceive]);
   const hasReceive = Number.isFinite(receiveNumeric) && receiveNumeric > 0;
@@ -191,6 +672,147 @@ function BorrowPageInner() {
     };
   }, [collateralExpanded]);
 
+  async function handleConfirmNewCollateralCngn() {
+    if (!canBorrow) {
+      setSummaryOpen(false);
+      return;
+    }
+
+    const lines = collateralLines
+      .map((line) => {
+        const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
+        return { symbol: line.symbol, amount: amt };
+      })
+      .filter((l) => Number.isFinite(l.amount) && l.amount > 0);
+
+    if (!lines.length) {
+      setSummaryOpen(false);
+      return;
+    }
+
+    setSummaryOpen(false);
+    setFailedOpen(false);
+    setSuccessOpen(false);
+    setIsProcessingBorrow(true);
+    setConfirmingOpen(true);
+
+    try {
+      const collateralAddresses = new Set<string>();
+
+      for (const line of lines) {
+        const resolved = resolveCollateralToken(line.symbol);
+        if (!resolved) {
+          // Skip tokens we can't resolve from wallet balances
+          continue;
+        }
+
+        const amountUnits = toSmallestUnits(String(line.amount), resolved.decimals);
+        if (amountUnits === "0") continue;
+
+        await depositCollateral({
+          tokenAddress: resolved.tokenAddress,
+          amount: amountUnits,
+          chainId: resolved.chainIdHex,
+        });
+
+        collateralAddresses.add(resolved.tokenAddress);
+      }
+
+      const numeric = Number.isFinite(receiveNumeric) && receiveNumeric > 0 ? receiveNumeric : 0;
+      const borrowAmountUnits = toSmallestUnits(String(numeric), CNGN_DECIMALS);
+      if (borrowAmountUnits === "0") {
+        setConfirmingOpen(false);
+        setIsProcessingBorrow(false);
+        return;
+      }
+
+      const tenureSeconds = tenureDays * 24 * 60 * 60;
+
+      const payload: BorrowRequest = {
+        tokenAddress: CNGN_BASE_ADDRESS,
+        amount: borrowAmountUnits,
+        chainId: "0x18", // Test mainnet for cNGN; adjust for your env
+        tenureSeconds,
+        collaterals: Array.from(collateralAddresses),
+        offramp: false,
+        currency: "NGN",
+        institutionId: "",
+      };
+
+      await borrow(payload);
+      setConfirmingOpen(false);
+      setIsProcessingBorrow(false);
+      setSuccessOpen(true);
+    } catch (e) {
+      console.error("Borrow flow failed", e);
+      setConfirmingOpen(false);
+      setIsProcessingBorrow(false);
+      setFailedOpen(true);
+    }
+  }
+
+  async function handleConfirmExistingCngnBorrow() {
+    if (!canBorrow) {
+      setSummaryOpen(false);
+      return;
+    }
+
+    setSummaryOpen(false);
+    setFailedOpen(false);
+    setSuccessOpen(false);
+    setIsProcessingBorrow(true);
+    setConfirmingOpen(true);
+
+    try {
+      // Collect all collateral token addresses from backend positions
+      const collateralAddresses = new Set<string>();
+      if (collateralPosition.data) {
+        Object.values(collateralPosition.data).forEach((list) => {
+          (list || []).forEach((asset: CollateralPosition) => {
+            const raw = Number(asset.amount);
+            const cfNum = Number(asset.cf) || 0;
+            const addr = String(asset.address || "").toLowerCase();
+            if (!Number.isFinite(raw) || raw <= 0) return;
+            if (cfNum <= 0) return;
+            if (!addr) return;
+            collateralAddresses.add(addr);
+          });
+        });
+      }
+
+      const numeric = Number.isFinite(receiveNumeric) && receiveNumeric > 0 ? receiveNumeric : 0;
+      const borrowAmountUnits = toSmallestUnits(String(numeric), CNGN_DECIMALS);
+      if (borrowAmountUnits === "0") {
+        setConfirmingOpen(false);
+        setIsProcessingBorrow(false);
+        return;
+      }
+
+      const tenureSeconds = tenureDays * 24 * 60 * 60;
+
+      const payload: BorrowRequest = {
+        tokenAddress: CNGN_BASE_ADDRESS,
+        amount: borrowAmountUnits,
+        chainId: "0x18", // Test chain for cNGN; adjust for your env
+        tenureSeconds,
+        collaterals: Array.from(collateralAddresses),
+        offramp: false,
+        currency: "NGN",
+        institutionId: "",
+      };
+
+      await borrow(payload);
+      setConfirmingOpen(false);
+      setIsProcessingBorrow(false);
+      setSuccessOpen(true);
+    } catch (e) {
+      console.error("Borrow flow failed (existing collateral)", e);
+      setConfirmingOpen(false);
+      setIsProcessingBorrow(false);
+      setFailedOpen(true);
+    }
+  }
+
   if (!mounted) {
     return (
       <div className="min-h-dvh">
@@ -228,8 +850,8 @@ function BorrowPageInner() {
               </button>
             </div>
 
-            {/* Existing portfolio summary (URL-driven sim) */}
-            {isExistingMode && (
+            {/* Existing portfolio summary (backend positions) */}
+            {isExistingMode && collateralExpanded && (
               <div className="mt-2 rounded-[16px] border border-gray-200 bg-white p-3">
                 <div className="text-[14px] text-gray-600">Collateral source</div>
                 <div className="mt-1 text-[14px] font-semibold text-gray-900">Existing portfolio</div>
@@ -251,12 +873,31 @@ function BorrowPageInner() {
                     type="button"
                     className="text-[13px] text-[#2200FF] underline underline-offset-4 cursor-pointer"
                     onClick={() => {
-                      router.push("/vault?sim=1");
+                      router.push("/vault");
                     }}
                   >
                     Manage collateral
                   </button>
                 </div>
+              </div>
+            )}
+
+            {isExistingMode && !collateralExpanded && (
+              <div className="mt-2 flex items-center gap-2 overflow-x-auto">
+                {existingPositions.map((pos, idx) => {
+                  const asset = assets.find((a) => a.symbol === pos.symbol);
+                  if (!asset) return null;
+                  return (
+                    <div
+                      key={`${pos.symbol}-${idx}`}
+                      className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2 py-1 text-[12px] text-gray-800"
+                    >
+                      <Image src={asset.icon} alt={asset.symbol} width={16} height={16} />
+                      <span className="font-medium">{asset.symbol}</span>
+                      <span>{formatNumber(pos.amount, 4)}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -286,42 +927,58 @@ function BorrowPageInner() {
 
             {!isExistingMode && collateralExpanded && (<>
               <div className="relative">
-                <div ref={listRef} className="mt-2 space-y-4 max-h-[160px] overflow-y-auto pr-1">
+                <div ref={listRef} className="mt-2 space-y-4 max-h-[160px] overflow-y-auto pr-1 u-shadow-inner scrollbar-fancy">
                 {collateralLines.map((line, idx) => {
-                const asset = assets.find((a) => a.symbol === line.symbol)!;
-                const balanceUsd = asset.balance * asset.priceUsd;
-                return (
-                  <div key={`${line.symbol}-${idx}`}>
-                    <CustomInput
-                      value={line.amount}
-                      onChange={(v) => {
-                        setCollateralLines((prev) => {
-                          const next = [...prev];
-                          next[idx] = { ...next[idx], amount: v };
-                          return next;
-                        });
-                      }}
-                      tokenLabel={asset.symbol}
-                      tokenIconSrc={asset.icon}
-                      onDropdownClick={() => { setAssetRowIndex(idx); setAssetModalOpen(true); }}
-                    />
-                    <div className="mt-2 flex items-center justify-between text-[14px] text-gray-500">
-                      <div>
-                        Balance: {formatNumber(asset.balance, 2)} {asset.symbol}
-                        <span className="ml-2">≈ ${formatNumber(balanceUsd, 2)}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {collateralLines.length > 1 && (
-                          <button type="button" className="text-red-500 cursor-pointer" onClick={() => {
-                            setCollateralLines((prev) => prev.filter((_, i) => i !== idx));
-                          }}>Remove</button>
-                        )}
-                        <button type="button" className="text-[#2200FF] cursor-pointer" onClick={() => handleMaxCollateral(idx)}>Max</button>
+                  const asset = assets.find((a) => a.symbol === line.symbol)!;
+                  const sym = asset.symbol.toUpperCase();
+                  const walletBal = balanceBySymbol.get(sym) ?? 0;
+                  const price = priceBySymbol.get(sym) ?? 0;
+                  const balanceUsd = walletBal * price;
+                  return (
+                    <div key={`${line.symbol}-${idx}`}>
+                      <CustomInput
+                        value={line.amount}
+                        onChange={(v) => {
+                          setCollateralLines((prev) => {
+                            const next = [...prev];
+                            next[idx] = { ...next[idx], amount: v };
+                            return next;
+                          });
+                        }}
+                        tokenLabel={asset.symbol}
+                        tokenIconSrc={asset.icon}
+                        onDropdownClick={() => { setAssetRowIndex(idx); setAssetModalOpen(true); }}
+                      />
+                      <div className="mt-2 flex items-center justify-between text-[14px] text-gray-500">
+                        <div>
+                          Balance: {formatNumber(walletBal, 2)} {asset.symbol}
+                          <span className="ml-2">≈ ${formatNumber(balanceUsd, 2)}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {collateralLines.length > 1 && (
+                            <button
+                              type="button"
+                              className="flex items-center gap-1.5 text-red-500 cursor-pointer"
+                              onClick={() => {
+                                setCollateralLines((prev) => prev.filter((_, i) => i !== idx));
+                              }}
+                            >
+                              <Image src="/settings/trash.svg" alt="Remove" width={14} height={14} />
+                              Remove
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="text-[#2200FF] cursor-pointer"
+                            onClick={() => handleMaxCollateral(idx)}
+                          >
+                            Max
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
                 </div>
                 {showTopShadow && (
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-white to-transparent" />
@@ -361,11 +1018,23 @@ function BorrowPageInner() {
                 invalid={isOverMax}
               />
             </div>
-            <div className="mt-2 flex items-center justify-between text-[14px] text-gray-500">
-              <div>
-                Max lending amount: <span className="font-semibold text-[#2200FF]">{formatFiat(selectedFiat.code, maxLendForCollateral)}</span>
+            <div className="mt-2 space-y-1.5">
+              <div className="flex items-center justify-between text-[14px] text-gray-500">
+                <div>
+                  Available to borrow: <span className="font-semibold text-[#2200FF]">{formatFiat(selectedFiat.code, maxLendForCollateral)}</span>
+                </div>
+                <button type="button" className="text-[#2200FF] cursor-pointer" onClick={handleMaxReceive}>Max</button>
               </div>
-              <button type="button" className="text-[#2200FF] cursor-pointer" onClick={handleMaxReceive}>Max</button>
+              {existingDebtInFiat > 0 && (
+                <div className="flex items-center justify-between text-[12px] text-gray-400">
+                  <div>
+                    Max capacity: <span className="font-medium text-gray-600">{formatFiat(selectedFiat.code, maxCapacityInFiat)}</span>
+                  </div>
+                  <div>
+                    Already borrowed: <span className="font-medium text-gray-600">{formatFiat(selectedFiat.code, existingDebtInFiat)}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -378,7 +1047,7 @@ function BorrowPageInner() {
                     <Image src="/icons/info.svg" alt="Info" width={18} height={18} />
                   </button>
                 </div>
-                <div className="font-semibold text-amber-600">{Math.round(LTV * 100)}%</div>
+                <div className="font-semibold text-amber-600">{Math.round(effectiveLtv * 100)}%</div>
               </div>
               <div className="mt-3 flex items-center justify-between text-[13px]">
                 <div className="text-gray-600">Borrow Limit</div>
@@ -435,7 +1104,9 @@ function BorrowPageInner() {
           <div className="space-y-3">
             <div className="text-[18px] font-semibold">Select token</div>
             <div className="divide-y divide-gray-100 rounded-2xl overflow-hidden">
-              {assets.map((a) => {
+              {assets
+                .filter((a) => availableCollateralSymbols.has(a.symbol.toUpperCase()))
+                .map((a) => {
                 const active = assetRowIndex !== null && collateralLines[assetRowIndex]?.symbol === a.symbol;
                 const usedElsewhere = collateralLines.some((l, i) => i !== assetRowIndex && l.symbol === a.symbol);
                 const disabled = usedElsewhere || active; // already selected elsewhere or same as current
@@ -542,24 +1213,43 @@ function BorrowPageInner() {
         <BorrowSummary
           onClose={() => setSummaryOpen(false)}
           onConfirm={() => {
+            if (isCngnOnchain) {
+              if (isExistingMode) {
+                void handleConfirmExistingCngnBorrow();
+              } else {
+                void handleConfirmNewCollateralCngn();
+              }
+              return;
+            }
             setSummaryOpen(false);
             setBankOpen(true);
           }}
-          collaterals={collateralLines.map((line) => {
-            const asset = assets.find((a) => a.symbol === line.symbol)!;
-            const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
-            return { symbol: asset.symbol, amount: isFinite(amt) ? amt : 0, icon: asset.icon };
-          })}
+          collaterals={
+            isExistingMode
+              ? existingPositions
+                  .map((pos): { symbol: string; amount: number; icon?: string } | null => {
+                  const asset = assets.find((a) => a.symbol === pos.symbol);
+                  if (!asset) return null;
+                  const amt = typeof pos.amount === "number" ? pos.amount : parseFloat(String(pos.amount || "0").replace(/,/g, ""));
+                  return { symbol: asset.symbol, amount: isFinite(amt) ? amt : 0, icon: asset.icon };
+                  })
+                  .filter((c): c is { symbol: string; amount: number; icon?: string } => c !== null)
+              : collateralLines.map((line) => {
+                  const asset = assets.find((a) => a.symbol === line.symbol)!;
+                  const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
+                  return { symbol: asset.symbol, amount: isFinite(amt) ? amt : 0, icon: asset.icon };
+                })
+          }
           receiveAmount={Number.isFinite(receiveNumeric) ? receiveNumeric : 0}
           fiatCode={selectedFiat.code}
-          ltvPercent={Math.round(LTV * 100)}
+          ltvPercent={Math.round(effectiveLtv * 100)}
           tenureDays={tenureDays}
           baseDailyRate={BASE_DAILY_RATE}
           overdueDailyRate={OVERDUE_DAILY_RATE}
         />
       </Modal>
 
-      {/* Bank selection step */}
+      {/* Bank selection step (kept, but without URL-driven fail sim) */}
       <BankSelectModal
         open={bankOpen}
         onClose={() => setBankOpen(false)}
@@ -580,7 +1270,7 @@ function BorrowPageInner() {
             if (pct >= 100) {
               window.clearInterval(timer);
               setConfirmingOpen(false);
-              if (borrowResultParam === "fail") setFailedOpen(true); else setSuccessOpen(true);
+              setSuccessOpen(true);
             }
           }, 120);
         }}

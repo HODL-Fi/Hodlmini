@@ -43,15 +43,19 @@ export default function AccountPill({
 
   const content = (
     <div className={`relative flex items-center gap-3 rounded-full px-3 py-2 ${containerClasses} ${className ?? ""}`}>
-      <span className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full ${iconWrapClasses}`}>{icon}</span>
-      <span className="text-left">
-        <span className="block text-[12px] leading-3 text-gray-600">{label}</span>
-        <span className={`block text-[16px] font-medium leading-5 tracking-tight ${
+      <span className={`relative inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${iconWrapClasses}`}>
+        <span className="flex items-center justify-center pointer-events-none">
+          {icon}
+        </span>
+      </span>
+      <span className="text-left flex-shrink-0 min-w-0">
+        <span className="block text-[12px] leading-3 text-gray-600 whitespace-nowrap">{label}</span>
+        <span className={`block text-[16px] font-medium leading-5 tracking-tight whitespace-nowrap ${
           (negative ?? /-/.test(amount)) ? "text-[#F34141]" : "text-gray-900"
         } ${hidden ? "blur-[5px]" : ""}`}>{amount}</span>
       </span>
       {verified && (
-        <span className="absolute -right-1 -top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white">
+        <span className="absolute -right-1 -top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white flex-shrink-0">
           <Image src="/checkmark.svg" alt="verified" width={14} height={14} />
         </span>
       )}

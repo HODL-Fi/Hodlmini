@@ -41,18 +41,27 @@ type FontContextType = {
 const FontContext = createContext<FontContextType | undefined>(undefined);
 
 export function FontProvider({ children }: { children: React.ReactNode }) {
-  const [selectedFont, setSelectedFontState] = useState<FontOption>(availableFonts[0]); // Default to Clash Display
+  // const [selectedFont, setSelectedFontState] = useState<FontOption>(availableFonts[0]); // Default to Clash Display
 
-  // Load font preference from localStorage on mount
-  useEffect(() => {
-    const savedFontId = localStorage.getItem("selectedFontId");
-    if (savedFontId) {
+  // // Load font preference from localStorage on mount
+  // useEffect(() => {
+  //   const savedFontId = localStorage.getItem("selectedFontId");
+  //   if (savedFontId) {
+  //     const font = availableFonts.find((f) => f.id === savedFontId);
+  //     if (font) {
+  //       setSelectedFontState(font);
+  //     }
+  //   }
+  // }, []);
+
+  const [selectedFont, setSelectedFontState] = useState<FontOption>(() => {
+    if (typeof window !== "undefined") {
+      const savedFontId = localStorage.getItem("selectedFontId");
       const font = availableFonts.find((f) => f.id === savedFontId);
-      if (font) {
-        setSelectedFontState(font);
-      }
+      if (font) return font;
     }
-  }, []);
+    return availableFonts[0];
+  });
 
   // Update body font when selectedFont changes
   useEffect(() => {

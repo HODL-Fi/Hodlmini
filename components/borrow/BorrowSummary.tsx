@@ -47,6 +47,11 @@ export default function BorrowSummary(props: BorrowSummaryProps) {
   }
 
   function formatFiat(code: string, amount: number) {
+    // cNGN is an on-chain token, show it explicitly as a token amount.
+    if (code === "cNGN") {
+      return `${formatNumber(amount)} cNGN`;
+    }
+
     const symbols: Record<string, string> = { NGN: "₦", ZAR: "R", GHC: "₵", KHS: "KSh" };
     const prefix = symbols[code] ?? "";
     return `${prefix}${formatNumber(amount)}`;
