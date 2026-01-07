@@ -9,16 +9,27 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
-
-const queryClient = new QueryClient();
-
 // Wrapper component to sync Privy token (must be inside PrivyAuthProvider)
 function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
   usePrivyTokenSync();
   return <>{children}</>;
 }
 
+// Create QueryClient at module level - MUST be created before any React Query hooks run
+// This ensures it exists before React Query's internal code tries to access refs
+const queryClientSingleton = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  // Use the module-level singleton - always available
+  const queryClient = queryClientSingleton;
+  
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");
   const inWalletSub = pathname?.startsWith("/wallet/") && pathname !== "/wallet";
@@ -34,10 +45,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     sdk.actions.ready();
   }, []);
 
-
-
-
-
   return (
     <div>
       <QueryClientProvider client={queryClient}>
@@ -48,7 +55,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 {children}
                 {hideBottomNav ? null : <BottomNav />}
               </div>
-              <ReactQueryDevtools initialIsOpen={false} />
+              {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
             </PrivyTokenSyncWrapper>
           </PrivyAuthProvider>
         </GoogleOAuthProvider>

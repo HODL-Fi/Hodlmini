@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import React, { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -30,7 +32,8 @@ function AuthPageInner() {
   const [otpModalOpen, setOtpModalOpen] = React.useState(false);
   const [otpEmail, setOtpEmail] = React.useState("");
   const [otpCode, setOtpCode] = React.useState("");
-  const otpRefs = React.useRef<Array<HTMLInputElement | null>>([]);
+  // Initialize refs array with 6 null values to ensure proper indexing
+  const otpRefs = React.useRef<(HTMLInputElement | null)[]>(Array(6).fill(null));
 
   const hasCountry = Boolean(country);
   const hasAccepted = acceptedTerms;
@@ -494,7 +497,11 @@ function AuthPageInner() {
                   return (
                     <input
                       key={i}
-                      ref={(el) => { otpRefs.current[i] = el; }}
+                      ref={(el) => {
+                        if (otpRefs.current && i >= 0 && i < 6) {
+                          otpRefs.current[i] = el;
+                        }
+                      }}
                       inputMode="numeric"
                       pattern="[0-9]*"
                       maxLength={1}
@@ -505,7 +512,7 @@ function AuthPageInner() {
                         const after = otpCode.slice(i + 1);
                         const next = (before + d + after).padEnd(6, "").slice(0, 6);
                         setOtpCode(next);
-                        if (d && i < 5) {
+                        if (d && i < 5 && otpRefs.current?.[i + 1]) {
                           otpRefs.current[i + 1]?.focus();
                         }
                       }}
@@ -513,10 +520,10 @@ function AuthPageInner() {
                         const isBackspace = e.key === "Backspace";
                         const isArrowLeft = e.key === "ArrowLeft";
                         const isArrowRight = e.key === "ArrowRight";
-                        if (isArrowLeft && i > 0) {
+                        if (isArrowLeft && i > 0 && otpRefs.current?.[i - 1]) {
                           e.preventDefault();
                           otpRefs.current[i - 1]?.focus();
-                        } else if (isArrowRight && i < 5) {
+                        } else if (isArrowRight && i < 5 && otpRefs.current?.[i + 1]) {
                           e.preventDefault();
                           otpRefs.current[i + 1]?.focus();
                         } else if (isBackspace) {
@@ -525,7 +532,7 @@ function AuthPageInner() {
                             const after = otpCode.slice(i + 1);
                             const next = (before + "" + after).padEnd(6, "").slice(0, 6);
                             setOtpCode(next);
-                          } else if (i > 0) {
+                          } else if (i > 0 && otpRefs.current?.[i - 1]) {
                             otpRefs.current[i - 1]?.focus();
                             const j = i - 1;
                             const before = otpCode.slice(0, j);
@@ -542,7 +549,9 @@ function AuthPageInner() {
                           e.preventDefault();
                           setOtpCode(text.padEnd(6, "").slice(0, 6));
                           const targetIndex = Math.min(text.length, 5);
-                          otpRefs.current[targetIndex]?.focus();
+                          if (otpRefs.current?.[targetIndex]) {
+                            otpRefs.current[targetIndex]?.focus();
+                          }
                         }
                       }}
                       className="w-12 h-12 text-center rounded-[10px] border border-gray-200 text-[18px] outline-none focus:ring-2 focus:ring-[#2200FF]/20 focus:border-[#2200FF]"
@@ -567,7 +576,9 @@ function AuthPageInner() {
                         disableSignup: !isSignup,
                       });
                       setOtpCode("");
-                      otpRefs.current[0]?.focus();
+                      if (otpRefs.current?.[0]) {
+                        otpRefs.current[0]?.focus();
+                      }
                     } catch (error: any) {
                       console.error("Failed to resend OTP:", error);
                       setModalVariant("email");
@@ -630,7 +641,9 @@ function AuthPageInner() {
                   
                   // Keep OTP code so user can see what they typed and correct it
                   // Focus on first input so they can easily edit
-                  otpRefs.current[0]?.focus();
+                  if (otpRefs.current?.[0]) {
+                    otpRefs.current[0]?.focus();
+                  }
                 }
               }}
             >

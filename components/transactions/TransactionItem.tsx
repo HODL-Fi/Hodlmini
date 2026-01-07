@@ -28,7 +28,7 @@ export type TransactionItemProps = {
   href?: string; // optional link
 };
 
-const typeToDefaults: Record<TransactionType, { title: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
+const typeToDefaults: Record<TransactionType, { title: string; Icon: React.ComponentType<{ size?: number | string; className?: string }> }> = {
   borrow: { title: "Money borrowed", Icon: HandCoins },
   repay: { title: "Loan repaid", Icon: ArrowUpFromLine },
   earn: { title: "Earnings", Icon: TrendingUp },

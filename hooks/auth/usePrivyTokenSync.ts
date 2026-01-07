@@ -10,10 +10,15 @@ export function usePrivyTokenSync() {
   const { getAccessToken, authenticated } = usePrivy();
 
   useEffect(() => {
+    // Guard against undefined getAccessToken (Privy not ready)
+    if (!getAccessToken || typeof getAccessToken !== 'function') {
+      return;
+    }
+    
     // Sync the getAccessToken function so it can be used by axios interceptors
     setPrivyTokenGetter(
       () => getAccessToken(),
-      () => authenticated
+      () => authenticated ?? false
     );
   }, [getAccessToken, authenticated]);
 }

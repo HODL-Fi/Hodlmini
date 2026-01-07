@@ -1,4 +1,7 @@
 "use client";
+
+export const dynamic = 'force-dynamic';
+
 import { TransactionsList } from "@/components/transactions";
 import AppHeader from "@/components/AppHeader";
 import Link from "next/link";
