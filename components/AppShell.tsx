@@ -16,11 +16,9 @@ function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  // Create QueryClient only on client side, using useState to ensure it's created once
-  const [queryClient] = useState<QueryClient | null>(() => {
-    if (typeof window === 'undefined') {
-      return null;
-    }
+  // Create QueryClient using useState lazy initializer
+  // Must be available for both SSR and client-side
+  const [queryClient] = useState(() => {
     try {
       return new QueryClient({
         defaultOptions: {
@@ -32,7 +30,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       });
     } catch (error) {
       console.error('Failed to create QueryClient:', error);
-      return null;
+      // Fallback: create a basic client even if there's an error
+      return new QueryClient();
     }
   });
   const pathname = usePathname();
@@ -53,22 +52,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 
 
-
-  // If QueryClient failed to initialize, render without it (fallback)
-  if (!queryClient) {
-    return (
-      <div>
-        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
-          <PrivyAuthProvider>
-            <div className={`mx-auto w-full max-w-[560px] min-h-dvh pt-[max(env(safe-area-inset-top),0px)] ${pb}`}>
-              {children}
-              {hideBottomNav ? null : <BottomNav />}
-            </div>
-          </PrivyAuthProvider>
-        </GoogleOAuthProvider>
-      </div>
-    );
-  }
 
   return (
     <div>
