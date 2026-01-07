@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import sdk from "@farcaster/miniapp-sdk";
@@ -15,16 +15,47 @@ function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
-  // Create QueryClient using useState with lazy initializer - ensures it's only created once
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        refetchOnWindowFocus: false,
-        retry: 1,
+// Create QueryClient singleton at module level - ensures it's always available
+// This prevents React Query from trying to access undefined refs during initialization
+let queryClientSingleton: QueryClient | undefined;
+
+function getQueryClient() {
+  if (typeof window === 'undefined') {
+    // SSR: return a new instance (won't be used, but satisfies type)
+    return new QueryClient({
+      defaultOptions: {
+        queries: {
+          refetchOnWindowFocus: false,
+          retry: 1,
+        },
       },
-    },
-  }));
+    });
+  }
+  
+  // Client-side: create singleton once
+  if (!queryClientSingleton) {
+    queryClientSingleton = new QueryClient({
+      defaultOptions: {
+        queries: {
+          refetchOnWindowFocus: false,
+          retry: 1,
+        },
+      },
+    });
+  }
+  
+  return queryClientSingleton;
+}
+
+export default function AppShell({ children }: { children: React.ReactNode }) {
+  // Use useRef to ensure QueryClient is stable across renders
+  const queryClientRef = useRef<QueryClient | null>(null);
+  
+  if (!queryClientRef.current) {
+    queryClientRef.current = getQueryClient();
+  }
+  
+  const queryClient = queryClientRef.current;
   
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");
