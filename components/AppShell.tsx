@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import sdk from "@farcaster/miniapp-sdk";
@@ -15,20 +15,16 @@ function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Create QueryClient singleton at module level to ensure it's available immediately
-// This prevents React Query from trying to access undefined refs during initialization
-const queryClientSingleton = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  // Use module-level singleton QueryClient - always available and stable
-  const queryClient = queryClientSingleton;
+  // Create QueryClient using useState with lazy initializer - ensures it's only created once
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: false,
+        retry: 1,
+      },
+    },
+  }));
   
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");
