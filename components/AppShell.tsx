@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import sdk from "@farcaster/miniapp-sdk";
@@ -15,20 +15,53 @@ function PrivyTokenSyncWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
-  // Use lazy initializer with useRef for React 19 compatibility
-  const queryClientRef = useRef<QueryClient>(
-    new QueryClient({
+// Create QueryClient singleton outside component for SSR safety
+let browserQueryClient: QueryClient | undefined = undefined;
+
+function getQueryClient() {
+  if (typeof window === 'undefined') {
+    // SSR: always return a new client
+    return new QueryClient({
       defaultOptions: {
         queries: {
           refetchOnWindowFocus: false,
           retry: 1,
         },
       },
-    })
-  );
-  
-  const queryClient = queryClientRef.current;
+    });
+  }
+  // Browser: use singleton pattern
+  if (!browserQueryClient) {
+    browserQueryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          refetchOnWindowFocus: false,
+          retry: 1,
+        },
+      },
+    });
+  }
+  return browserQueryClient;
+}
+
+export default function AppShell({ children }: { children: React.ReactNode }) {
+  // Use useMemo to ensure stable reference across renders
+  const queryClient = useMemo(() => {
+    try {
+      return getQueryClient();
+    } catch (error) {
+      console.error('Failed to create QueryClient:', error);
+      // Fallback: create a new client if singleton fails
+      return new QueryClient({
+        defaultOptions: {
+          queries: {
+            refetchOnWindowFocus: false,
+            retry: 1,
+          },
+        },
+      });
+    }
+  }, []);
   const pathname = usePathname();
   const inTx = pathname?.startsWith("/home/transactions");
   const inWalletSub = pathname?.startsWith("/wallet/") && pathname !== "/wallet";
