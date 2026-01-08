@@ -361,5 +361,16 @@
     "walletType": "ETHEREUM",
     "createdAt": "2026-01-05T09:55:03.432Z",
     "updatedAt": "2026-01-05T09:55:03.432Z"
+  },
+  {
+    "id": "7f57ab9c-1bbc-47c7-b9c2-3d969cefdcb1",
+    "transactionType": "DEPOSIT",
+    "remark": "Deposit 10000000000000000000 of 0x0000000000000000000000000000000000000001 to vault",
+    "transactionHash": "0x6c1b6876e442f2cd7c8abed4b2879e21400be10e65abaa53c0a703bacbc1055e",
+    "amount": "10000000000000000000.0000",
+    "status": "SUCCESS",
+    "walletType": "ETHEREUM",
+    "createdAt": "2026-01-05T09:55:03.432Z",
+    "updatedAt": "2026-01-05T09:55:03.432Z"
   }
 ]
