@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { postFetch } from "@/utils/api/fetch";
+import { refreshAccessTokenForOnchain } from "@/utils/auth/privyToken";
 
 export type withdrawColRequest = {
   tokenAddress: string;
@@ -32,6 +33,10 @@ export interface withdrawColError {
 
 
 const withdrawCollateralFn = async (payload: withdrawColRequest): Promise<withdrawColResponse> => {
+  // Refresh token proactively before onchain operation
+  const token = await refreshAccessTokenForOnchain();
+  console.log("[Withdraw Collateral] Starting onchain transaction with refreshed token");
+  
   const res = await postFetch<withdrawColResponse, withdrawColRequest>("/lending/withdraw-collateral", payload);
   return res.data;  // backend wraps response under `data`
 };

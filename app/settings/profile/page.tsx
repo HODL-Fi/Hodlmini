@@ -35,7 +35,7 @@ export default function ProfilePage() {
 
   // Use API username if available, otherwise use generated one
   const displayUsername = profile?.username ?? fallbackUsername;
-  const isKycVerified = profile?.kycStatus === "VERIFIED" && profile?.name;
+  const hasName = Boolean(profile?.name);
 
   const [fullName, setFullName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -48,7 +48,7 @@ export default function ProfilePage() {
   React.useEffect(() => {
     if (profile) {
       const profileEmail = profile.email || "";
-      const profileName = (isKycVerified && profile.name) ? profile.name : "";
+      const profileName = profile.name || "";
       const profileUsername = displayUsername;
 
       // Set current values
@@ -63,9 +63,9 @@ export default function ProfilePage() {
         userName: profileUsername,
       });
     }
-  }, [profile, displayUsername, isKycVerified]);
+  }, [profile, displayUsername]);
 
-  const dirty = fullName !== initial.fullName || userName !== initial.userName || Boolean(avatarUrl);
+  const dirty = userName !== initial.userName || Boolean(avatarUrl);
 
   function onSelectAvatar(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -99,13 +99,14 @@ export default function ProfilePage() {
         </section>
 
         <section className="mx-auto mt-6 max-w-[560px] space-y-5">
-          {isKycVerified && (
+          {hasName && (
             <div>
               <div className="text-[14px] text-gray-600">Full name</div>
               <input
                 value={fullName}
-                onChange={(e)=>setFullName(e.target.value)}
-                className="mt-2 w-full rounded-[14px] border border-gray-200 bg-white px-3 py-3 text-[16px] outline-none"
+                className="mt-2 w-full rounded-[14px] border border-gray-200 bg-gray-50 px-3 py-3 text-[16px] outline-none cursor-not-allowed"
+                readOnly
+                disabled
                 placeholder={isLoading ? "Loading..." : ""}
               />
             </div>

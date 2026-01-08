@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { postFetch } from "@/utils/api/fetch";
+import { refreshAccessTokenForOnchain } from "@/utils/auth/privyToken";
 
 export interface DepositColResponse {
   id: string;
@@ -32,6 +33,10 @@ export type DepositColRequest = {
 const depositCollateralFn = async (
   payload: DepositColRequest
 ): Promise<DepositColResponse> => {
+  // Refresh token proactively before onchain operation
+  const token = await refreshAccessTokenForOnchain();
+  console.log("[Deposit Collateral] Starting onchain transaction with refreshed token");
+  
   const res = await postFetch<DepositColResponse, DepositColRequest>(
     "/lending/deposit-collateral",
     payload

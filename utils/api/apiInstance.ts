@@ -29,6 +29,13 @@ axiosInstance.interceptors.request.use(
 
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        
+        // Log token usage for onchain operations
+        const isOnchainOperation = config.url?.includes('/lending/') || config.url?.includes('/users/send');
+        if (isOnchainOperation) {
+          console.log(`[API Request] Using access token for onchain operation: ${config.method?.toUpperCase()} ${config.url}`);
+          console.log(`[API Request] Token (first 20 chars): ${token.substring(0, 20)}...`);
+        }
       }
     }
     return config;

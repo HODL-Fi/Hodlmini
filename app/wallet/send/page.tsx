@@ -20,7 +20,7 @@ import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
 import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
 import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
 import { useRouter } from "next/navigation";
-import { getTokenDecimals } from "@/utils/constants/tokenDecimals";
+import { getTokenDecimals, ETHER_ADDRESS } from "@/utils/constants/tokenDecimals";
 
 export default function SendPage() {
   const router = useRouter();
@@ -74,8 +74,11 @@ export default function SendPage() {
 
   const canSend = Boolean(amount) && Boolean(toAddress);
 
-  const selectedChainIdHex =
-    CHAIN_IDS[selectedChain.key as keyof typeof CHAIN_IDS] ?? CHAIN_IDS.TEST;
+  const selectedChainIdHexRaw =
+    CHAIN_IDS[selectedChain.key as keyof typeof CHAIN_IDS] ?? CHAIN_IDS.BASE;
+  const selectedChainIdHex = typeof selectedChainIdHexRaw === "string"
+    ? selectedChainIdHexRaw
+    : `0x${(selectedChainIdHexRaw as number).toString(16)}`;
 
   const parsedAmount = React.useMemo(() => {
     const n = Number((amount || "").replace(/,/g, ""));
@@ -184,10 +187,22 @@ export default function SendPage() {
   const amountUsd = parsedAmount * tokenPrice;
   const walletBalanceUsd = walletBalanceTokens * tokenPrice;
 
-  const tokenAddress =
-    selectedTokenBalance?.symbol.toUpperCase() === "ETH"
-      ? "0x0000000000000000000000000000000000000000"
-      : selectedTokenBalance?.contractAddress ?? "0x0000000000000000000000000000000000000000";
+  const tokenAddress = React.useMemo(() => {
+    if (!selectedTokenBalance) return "0x0000000000000000000000000000000000000000";
+    
+    const symbol = selectedTokenBalance.symbol.toUpperCase();
+    const contractAddr = selectedTokenBalance.contractAddress;
+    
+    // If ETH (by symbol or by the special ETH address), use ETHER_ADDRESS
+    if (symbol === "ETH" || 
+        contractAddr === ETHER_ADDRESS || 
+        contractAddr === "0x0000000000000000000000000000000000000001") {
+      return ETHER_ADDRESS;
+    }
+    
+    // For other tokens, use the contract address or fallback
+    return contractAddr ?? "0x0000000000000000000000000000000000000000";
+  }, [selectedTokenBalance]);
 
   function formatAmount(n: number) {
     return new Intl.NumberFormat("en-US", {

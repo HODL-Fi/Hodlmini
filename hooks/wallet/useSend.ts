@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { postFetch } from "@/utils/api/fetch";
+import { refreshAccessTokenForOnchain } from "@/utils/auth/privyToken";
 
 export interface SendRequest {
   chainId: string;
@@ -29,6 +30,10 @@ export interface SendError {
 }
 
 const sendFn = async (payload: SendRequest): Promise<SendResponse> => {
+  // Refresh token proactively before onchain operation
+  const token = await refreshAccessTokenForOnchain();
+  console.log("[Send] Starting onchain transaction with refreshed token");
+  
   const res = await postFetch<SendResponse, SendRequest>("/users/send", payload);
   return res.data ?? (res as any);
 };

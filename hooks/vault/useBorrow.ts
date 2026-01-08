@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMutation } from "@tanstack/react-query";
 import { postFetch } from "@/utils/api/fetch";
+import { refreshAccessTokenForOnchain } from "@/utils/auth/privyToken";
 
 export type BorrowRequest = {
   tokenAddress: string;
@@ -46,6 +47,10 @@ export interface BorrowErrorResponse {
 }
 
 const borrowFn = async (payload: BorrowRequest): Promise<BorrowSuccessResponse> => {
+  // Refresh token proactively before onchain operation
+  const token = await refreshAccessTokenForOnchain();
+  console.log("[Borrow] Starting onchain transaction with refreshed token");
+  
   const res = await postFetch<BorrowSuccessResponse, BorrowRequest>("/lending/borrow", payload);
   return res.data;
 };

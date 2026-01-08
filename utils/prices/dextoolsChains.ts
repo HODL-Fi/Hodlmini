@@ -8,10 +8,10 @@ export type DextoolsChainId = "ether" | "bsc" | "base";
 // so it uses "base" for DEXTools. When we re-enable other chains in CHAIN_IDS,
 // we can extend this map accordingly.
 export const DEXTOOLS_CHAINS: Record<string, DextoolsChainId> = {
-  [CHAIN_IDS.TEST]: "base",
+  "0x18": "base", // Test Chain
+  [CHAIN_IDS.BASE]: "base",
   // [CHAIN_IDS.ETH]: "ether",
   // [CHAIN_IDS.BSC]: "bsc",
-  // [CHAIN_IDS.BASE]: "base",
 };
 
 

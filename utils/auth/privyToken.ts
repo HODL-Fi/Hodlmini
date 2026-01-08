@@ -51,3 +51,22 @@ export function isPrivyAuthenticated(): boolean {
   return isAuthenticatedFn?.() ?? false;
 }
 
+/**
+ * Proactively refresh the access token before onchain operations
+ * This ensures we have a fresh token before making requests that require onchain authorization
+ * @returns The fresh access token, or null if unavailable
+ */
+export async function refreshAccessTokenForOnchain(): Promise<string | null> {
+  // Get fresh token from Privy (this also updates localStorage)
+  const token = await getPrivyAccessToken();
+  
+  if (token) {
+    console.log("[Onchain Token Refresh] New access token obtained:", token.substring(0, 20) + "...");
+    console.log("[Onchain Token Refresh] Full token:", token);
+  } else {
+    console.warn("[Onchain Token Refresh] No access token available for onchain operation");
+  }
+  
+  return token;
+}
+

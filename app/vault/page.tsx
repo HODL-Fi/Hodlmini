@@ -554,27 +554,22 @@ function VaultPageInner() {
   function normalizeHealthFactor(raw: number | string | undefined): number | null {
     if (raw === undefined || raw === null) return null;
 
-    // Backend sometimes returns scientific notation like "2.31165488e+40".
-    // For display, treat the mantissa as the value and drop the exponent,
-    // then clamp to a finite number.
+    // Parse the value - handle both scientific notation and regular numbers
+    let n: number;
     if (typeof raw === "string" && /e/i.test(raw)) {
-      const [mantissa] = raw.split(/e/i);
-      const m = Number(mantissa);
-      if (!Number.isFinite(m)) return null;
-      return m;
+      // Parse scientific notation properly (e.g., "1.6675411094265068e+24")
+      n = Number(raw);
+    } else {
+      n = Number(raw);
     }
 
-    const n = Number(raw);
-    if (!Number.isFinite(n)) return null;
+    if (!Number.isFinite(n) || n <= 0) return null;
 
-    // Health factors are typically between 0.5 and 5.0
-    // If the number is very large (> 1e12), it's likely 1e18 scaled
-    // Normalize by dividing by 1e18
-    if (n > 1e12) {
-      return n / 1e18;
-    }
-
-    return n;
+    // Backend returns health factors scaled by 1e18
+    // 1e18 = HF of 1.0 (liquidation threshold)
+    // Divide by 1e18 to get the actual health factor
+    // The further from 1, the safer (higher) or riskier (lower)
+    return n / 1e18;
   }
 
   const apiHealthFactor = React.useMemo(() => {
@@ -605,11 +600,28 @@ function VaultPageInner() {
 
   // Calculate risk percentage from the actual health factor being displayed
   const healthFactorForBar = React.useMemo(() => {
+    // If all values are zero (or null), user has no collateral/debt - health factor should be infinity
+    const collateral = apiValues.collateral ?? 0;
+    const debt = apiValues.debt ?? 0;
+    const available = apiValues.available ?? 0;
+    const hasNoPosition = collateral === 0 && debt === 0 && available === 0;
+    
+    if (hasNoPosition) {
+      return Infinity;
+    }
+    
     // Use API health factor if available, otherwise fall back to calculated one
-    return apiHealthFactor !== null && Number.isFinite(apiHealthFactor) 
+    const hf = apiHealthFactor !== null && Number.isFinite(apiHealthFactor) 
       ? apiHealthFactor 
       : (Number.isFinite(totals.hf) ? totals.hf : null);
-  }, [apiHealthFactor, totals.hf]);
+    
+    // If health factor is very large (> 1000), treat as infinity for display and risk calculation
+    if (hf !== null && Number.isFinite(hf) && hf > 1000) {
+      return Infinity;
+    }
+    
+    return hf;
+  }, [apiHealthFactor, totals.hf, apiValues.collateral, apiValues.debt, apiValues.available]);
 
   const riskPctForBar = React.useMemo(() => {
     if (healthFactorForBar === null || !Number.isFinite(healthFactorForBar)) return 0;
@@ -693,9 +705,13 @@ function VaultPageInner() {
               </button>
             </div>
             <div className="font-semibold">
-              {apiHealthFactor !== null 
-                ? (Number.isFinite(apiHealthFactor) ? apiHealthFactor.toFixed(2) : "—")
-                : (Number.isFinite(totals.hf) ? totals.hf.toFixed(2) : "—")
+              {healthFactorForBar === null
+                ? "—"
+                : healthFactorForBar === Infinity
+                ? "∞"
+                : Number.isFinite(healthFactorForBar)
+                ? healthFactorForBar.toFixed(2)
+                : "—"
               }
             </div>
           </div>

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { TransactionsList } from "@/components/transactions";
 import AppHeader from "@/components/AppHeader";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeftIcon } from "@customIcons";
 import TransactionsFilterTrigger from "@/components/transactions/TransactionsFilterTrigger";
 import React from "react";
@@ -295,10 +296,26 @@ export default function HomeTransactionsPage() {
         }
       />
       <div className="mt-3">
-        <TransactionsList
-          title=""
-          items={transactionItems}
-        />
+        {transactionItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4 rounded-[16px] border border-gray-200 bg-white">
+            <Image 
+              src="/icons/sad.svg" 
+              alt="No transactions" 
+              width={72} 
+              height={72} 
+              className="mb-4"
+            />
+            <div className="text-[16px] font-semibold text-gray-900">No Transactions</div>
+            <div className="text-[12px] text-gray-600 mt-1 text-center">
+              You don't have any transactions yet.
+            </div>
+          </div>
+        ) : (
+          <TransactionsList
+            title=""
+            items={transactionItems}
+          />
+        )}
       </div>
     </div>
   );

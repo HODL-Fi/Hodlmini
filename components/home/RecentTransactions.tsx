@@ -1,5 +1,7 @@
 "use client";
 import React from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { TransactionsList } from "@/components/transactions";
 import useGetUserTxHistory from "@/hooks/user/useGetUserTxHistory";
 import { parseTransaction, ParsedTransaction } from "@/utils/transactions/parseTransaction";
@@ -186,11 +188,27 @@ export default function RecentTransactions() {
 
   if (transactionItems.length === 0) {
     return (
-      <TransactionsList
-        title="Transactions"
-        viewAllHref="/home/transactions"
-        items={[]}
-      />
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-[20px] font-semibold leading-6">Transactions</h2>
+          <Link href="/home/transactions" className="text-[14px] underline underline-offset-2 text-gray-700">
+            View all
+          </Link>
+        </div>
+        <div className="flex flex-col items-center justify-center py-12 px-4 rounded-[16px] border border-gray-200 bg-white">
+          <Image 
+            src="/icons/sad.svg" 
+            alt="No transactions" 
+            width={72} 
+            height={72} 
+            className="mb-4"
+          />
+          <div className="text-[16px] font-semibold text-gray-900">No Transactions</div>
+          <div className="text-[12px] text-gray-600 mt-1 text-center">
+            You don't have any transactions yet.
+          </div>
+        </div>
+      </section>
     );
   }
 

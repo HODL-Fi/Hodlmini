@@ -5,17 +5,60 @@ import Image from "next/image";
 import BorrowTopNav from "@/components/BorrowTopNav";
 import Modal from "@/components/ui/Modal";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import useGetLinkedAccounts from "@/hooks/settings/useGetLinkedAccounts";
+import { useDeleteLinkedAccount } from "@/hooks/settings/useDeleteLinkedAccount";
+import useGetUserProfile from "@/hooks/user/useGetUserProfile";
+import useGetSupportedInstitutions from "@/hooks/offramp/useGetSupportedInstitutions";
+import { getBankLogo } from "@/utils/banks/bankLogos";
 
 type Linked = { id: string; name: string; number: string; bank: string; logo: string };
 
 export default function LinkedAccountsPage() {
   const router = useRouter();
-  const [items, setItems] = React.useState<Linked[]>([
-    { id: "uba-1", name: "Zeebriya Jasper", number: "0123498765", bank: "United Bank for Africa", logo: "/banks/uba.svg" },
-    { id: "fbn-2", name: "Zeebriya Jasper Hernandes", number: "0123498765", bank: "First Bank", logo: "/banks/fbn.svg" },
-    { id: "rvn-3", name: "Zeebriya Jasper", number: "3498760125", bank: "Raven Bank", logo: "/banks/bank.svg" },
-  ]);
+  const queryClient = useQueryClient();
+  const { data: profile } = useGetUserProfile();
+  const { data: linkedAccounts, isLoading } = useGetLinkedAccounts();
+  const { mutateAsync: deleteLinkedAccount, isPending: isDeleting } = useDeleteLinkedAccount();
   const [toDelete, setToDelete] = React.useState<Linked | null>(null);
+
+  // Determine currency based on user's country (NG = NGN)
+  const currency = React.useMemo(() => {
+    if (profile?.country?.toLowerCase() === "ng") {
+      return "NGN";
+    }
+    return "NGN";
+  }, [profile?.country]);
+
+  const { data: institutionsData } = useGetSupportedInstitutions(currency);
+
+  // Create a map from Swift code to bank name for lookup
+  const swiftCodeToNameMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    if (institutionsData?.institutions) {
+      institutionsData.institutions.forEach((institution) => {
+        map.set(institution.code.toUpperCase(), institution.name);
+      });
+    }
+    return map;
+  }, [institutionsData]);
+
+  // Map API response to display format
+  const items = React.useMemo<Linked[]>(() => {
+    if (!linkedAccounts) return [];
+    
+    return linkedAccounts.map((account) => {
+      // Get bank name from Swift code mapping, fallback to bankName from API
+      const bankName = swiftCodeToNameMap.get(account.bankCode.toUpperCase()) || account.bankName;
+      return {
+        id: account.id,
+        name: account.accountName,
+        number: account.accountNumber,
+        bank: bankName,
+        logo: getBankLogo(account.bankCode, bankName),
+      };
+    });
+  }, [linkedAccounts, swiftCodeToNameMap]);
 
   return (
     <div className="min-h-dvh">
@@ -25,27 +68,45 @@ export default function LinkedAccountsPage() {
         </div>
 
         <section className="mx-auto mt-4 max-w-[560px] space-y-6">
-          {items.map((it) => (
-            <div key={it.id} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-                  <Image src={it.logo} alt={it.bank} width={36} height={36} />
-                </span>
-                <div>
-                  <div className="text-[20px] font-semibold leading-6">{it.name}</div>
-                  <div className="mt-1 text-[14px] text-gray-600">{it.number} <span className="mx-2">|</span> {it.bank}</div>
-                </div>
+          {isLoading ? (
+            <div className="px-3 py-6 text-center text-[14px] text-gray-600">Loading linked accounts...</div>
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <Image 
+                src="/icons/sad.svg" 
+                alt="No linked accounts" 
+                width={72} 
+                height={72} 
+                className="mb-4"
+              />
+              <div className="text-[16px] font-semibold text-gray-900">No Linked Accounts</div>
+              <div className="text-[12px] text-gray-600 mt-1 text-center">
+                You don't have any linked bank accounts yet.
               </div>
-              <button
-                type="button"
-                aria-label="Delete linked account"
-                onClick={() => setToDelete(it)}
-                className="rounded-full p-2 text-red-500 hover:bg-red-50 cursor-pointer"
-              >
-                <Image src="/settings/trash.svg" alt="Delete" width={20} height={20} />
-              </button>
             </div>
-          ))}
+          ) : (
+            items.map((it) => (
+              <div key={it.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                    <Image src={it.logo} alt={it.bank} width={36} height={36} />
+                  </span>
+                  <div>
+                    <div className="text-[20px] font-semibold leading-6">{it.name}</div>
+                    <div className="mt-1 text-[14px] text-gray-600">{it.number} <span className="mx-2">|</span> {it.bank}</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Delete linked account"
+                  onClick={() => setToDelete(it)}
+                  className="rounded-full p-2 text-red-500 hover:bg-red-50 cursor-pointer"
+                >
+                  <Image src="/settings/trash.svg" alt="Delete" width={20} height={20} />
+                </button>
+              </div>
+            ))
+          )}
         </section>
 
         <div className="fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),8px)+64px)]">
@@ -61,12 +122,12 @@ export default function LinkedAccountsPage() {
         </div>
       </main>
 
-      <Modal open={!!toDelete} onClose={() => setToDelete(null)}>
+      <Modal open={!!toDelete} onClose={() => !isDeleting && setToDelete(null)}>
         {toDelete && (
           <div className="space-y-4">
             <div className="flex items-start justify-between">
               <div className="text-[24px] font-semibold leading-6">Delete linked account</div>
-              <button type="button" aria-label="Close" onClick={() => setToDelete(null)} className="rounded-full p-2 text-gray-600 hover:bg-gray-100 cursor-pointer">
+              <button type="button" aria-label="Close" onClick={() => !isDeleting && setToDelete(null)} className="rounded-full p-2 text-gray-600 hover:bg-gray-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" disabled={isDeleting}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
@@ -83,11 +144,33 @@ export default function LinkedAccountsPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button type="button" className="w-1/2 rounded-[18px] bg-gray-200 px-4 py-3 text-[14px] font-semibold text-gray-800" onClick={() => {
-                setItems(prev => prev.filter(x => x.id !== toDelete.id));
-                setToDelete(null);
-              }}>Yes, delete</button>
-              <button type="button" className="w-1/2 rounded-[18px] bg-[#EF4444] px-4 py-3 text-[14px] font-semibold text-white" onClick={() => setToDelete(null)}>No, cancel</button>
+              <button 
+                type="button" 
+                className="w-1/2 rounded-[18px] bg-gray-200 px-4 py-3 text-[14px] font-semibold text-gray-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" 
+                onClick={async () => {
+                  if (toDelete) {
+                    try {
+                      await deleteLinkedAccount(toDelete.id);
+                      await queryClient.invalidateQueries({ queryKey: ["linked_accounts"] });
+                      setToDelete(null);
+                    } catch (error) {
+                      console.error("Failed to delete linked account:", error);
+                      // TODO: Show error toast/notification
+                    }
+                  }
+                }}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Yes, delete"}
+              </button>
+              <button 
+                type="button" 
+                className="w-1/2 rounded-[18px] bg-[#EF4444] px-4 py-3 text-[14px] font-semibold text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" 
+                onClick={() => setToDelete(null)}
+                disabled={isDeleting}
+              >
+                No, cancel
+              </button>
             </div>
           </div>
         )}

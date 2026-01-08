@@ -70,8 +70,18 @@ export default function VaultCollateralPositions({
       <div className="px-2 py-2 text-[14px] font-semibold">Collateral positions</div>
       <div className="divide-y divide-gray-100">
         {positions.length === 0 && (
-          <div className="px-2 py-6 text-center text-[14px] text-gray-600">
-            No collateral yet. Deposit assets to start borrowing.
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <Image 
+              src="/icons/sad.svg" 
+              alt="No positions" 
+              width={72} 
+              height={72} 
+              className="mb-4"
+            />
+            <div className="text-[16px] font-semibold text-gray-900">No Collateral</div>
+            <div className="text-[12px] text-gray-600 mt-1 text-center">
+              You don't have any collateral positions yet. Deposit assets to start borrowing.
+            </div>
           </div>
         )}
         {positions.map((p, idx) => {
