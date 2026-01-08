@@ -33,7 +33,9 @@ function AuthPageInner() {
   const [otpEmail, setOtpEmail] = React.useState("");
   const [otpCode, setOtpCode] = React.useState("");
   // Initialize refs array with 6 null values to ensure proper indexing
-  const otpRefs = React.useRef<(HTMLInputElement | null)[]>(Array(6).fill(null));
+  // const otpRefs = React.useRef<(HTMLInputElement | null)[]>(Array(6).fill(null));
+
+  const otpRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
   const hasCountry = Boolean(country);
   const hasAccepted = acceptedTerms;
@@ -84,6 +86,17 @@ function AuthPageInner() {
   });
   
   const { completePrivyLogin } = usePrivyLogin();
+
+
+  React.useEffect(() => {
+  if (!otpModalOpen) return;
+
+  otpRefs.current = Array(6).fill(null);
+
+  requestAnimationFrame(() => {
+    otpRefs.current?.[0]?.focus();
+  });
+  }, [otpModalOpen]);
 
   const checkRequirements = () => {
     if (isSignup && (!country || !acceptedTerms)) {
@@ -497,10 +510,13 @@ function AuthPageInner() {
                   return (
                     <input
                       key={i}
+                      // ref={(el) => {
+                      //   if (otpRefs.current && i >= 0 && i < 6) {
+                      //     otpRefs.current[i] = el;
+                      //   }
+                      // }}
                       ref={(el) => {
-                        if (otpRefs.current && i >= 0 && i < 6) {
-                          otpRefs.current[i] = el;
-                        }
+                        otpRefs.current[i] = el;
                       }}
                       inputMode="numeric"
                       pattern="[0-9]*"
@@ -549,9 +565,12 @@ function AuthPageInner() {
                           e.preventDefault();
                           setOtpCode(text.padEnd(6, "").slice(0, 6));
                           const targetIndex = Math.min(text.length, 5);
-                          if (otpRefs.current?.[targetIndex]) {
-                            otpRefs.current[targetIndex]?.focus();
-                          }
+                          // if (otpRefs.current?.[targetIndex]) {
+                          //   otpRefs.current[targetIndex]?.focus();
+                          // }
+                          requestAnimationFrame(() => {
+                            otpRefs.current?.[targetIndex]?.focus();
+                          });
                         }
                       }}
                       className="w-12 h-12 text-center rounded-[10px] border border-gray-200 text-[18px] outline-none focus:ring-2 focus:ring-[#2200FF]/20 focus:border-[#2200FF]"
