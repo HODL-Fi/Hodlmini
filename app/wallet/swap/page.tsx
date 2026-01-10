@@ -11,6 +11,7 @@ import TxConfirmModal from "@/components/wallet/TxConfirmModal";
 import ProcessingModal from "@/components/wallet/ProcessingModal";
 import TxSuccessModal from "@/components/wallet/TxSuccessModal";
 import TxFailedModal from "@/components/wallet/TxFailedModal";
+import OfframpReceiptModal, { OfframpReceiptData } from "@/components/wallet/OfframpReceiptModal";
 import { CHAIN_IDS } from "@/utils/constants/chainIds";
 import { useGetAllChainBalances } from "@/hooks/wallet/useGetTokenWalletBalance";
 import { LOCAL_TOKEN_ICONS } from "@/utils/constants/localTokenIcons";
@@ -20,6 +21,8 @@ import { useCreateOfframpOrder } from "@/hooks/offramp/useCreateOfframpOrder";
 import useGetLinkedAccounts from "@/hooks/settings/useGetLinkedAccounts";
 import { getBankLogo, getBankNameByCode } from "@/utils/banks/bankLogos";
 import { CNGN_BASE_ADDRESS } from "@/utils/constants/cngn";
+import useGetSupportedInstitutions from "@/hooks/offramp/useGetSupportedInstitutions";
+import useGetUserProfile from "@/hooks/user/useGetUserProfile";
 
 type ChainKey = "ETH" | "BSC" | "LSK" | "BASE" | "TEST";
 
@@ -103,12 +106,37 @@ export default function SwapPage() {
   const { data: linkedAccounts } = useGetLinkedAccounts();
   const { mutateAsync: createOrder, isPending: isCreatingOrder } = useCreateOfframpOrder();
   
+  // Get user profile to determine currency
+  const { data: profile } = useGetUserProfile();
+  const currency = React.useMemo(() => {
+    if (profile?.country?.toLowerCase() === "ng") {
+      return "NGN";
+    }
+    return "NGN";
+  }, [profile?.country]);
+  
+  // Get supported institutions to resolve bank names
+  const { data: institutionsData } = useGetSupportedInstitutions(currency);
+  
+  // Create a map from Swift code to bank name for lookup
+  const swiftCodeToNameMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    if (institutionsData?.institutions) {
+      institutionsData.institutions.forEach((institution) => {
+        map.set(institution.code.toUpperCase(), institution.name);
+      });
+    }
+    return map;
+  }, [institutionsData]);
+  
 
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [processingOpen, setProcessingOpen] = React.useState(false);
   const [successOpen, setSuccessOpen] = React.useState(false);
   const [failedOpen, setFailedOpen] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
+  const [receiptOpen, setReceiptOpen] = React.useState(false);
+  const [offrampReceipt, setOfframpReceipt] = React.useState<OfframpReceiptData | null>(null);
 
   // Quote/Slippage/Fees (still mocked)
   const [slippagePct, setSlippagePct] = React.useState<number>(0.5); // %
@@ -380,7 +408,7 @@ export default function SwapPage() {
                 <span className="loading-dots ml-1">
                   <span className="dot">.</span><span className="dot">.</span><span className="dot">.</span>
                 </span>
-              </div>
+            </div>
             )}
           </div>
         </section>
@@ -411,38 +439,38 @@ export default function SwapPage() {
             </div>
           ) : (
             <>
-              <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
-                <div className="text-gray-600">Min received</div>
-                <div className="text-right font-semibold">
-                  {minReceived.toFixed(6)} {toAsset?.symbol ?? ""}
-                </div>
-                <div className="text-gray-600">Price impact</div>
-                <div className="text-right font-semibold">{priceImpactPct.toFixed(2)}%</div>
-                <div className="text-gray-600">Network fee</div>
-                <div className="text-right font-semibold">${networkFeeUsd.toFixed(2)}</div>
-                <div className="text-gray-600">Estimated time</div>
-                <div className="text-right font-semibold">≈ 30s</div>
-              </div>
+          <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
+            <div className="text-gray-600">Min received</div>
+            <div className="text-right font-semibold">
+              {minReceived.toFixed(6)} {toAsset?.symbol ?? ""}
+            </div>
+            <div className="text-gray-600">Price impact</div>
+            <div className="text-right font-semibold">{priceImpactPct.toFixed(2)}%</div>
+            <div className="text-gray-600">Network fee</div>
+            <div className="text-right font-semibold">${networkFeeUsd.toFixed(2)}</div>
+            <div className="text-gray-600">Estimated time</div>
+            <div className="text-right font-semibold">≈ 30s</div>
+          </div>
 
-              <div className="mt-4">
-                <div className="mb-2 text-[14px] text-gray-600">Slippage tolerance</div>
-                <div className="flex flex-wrap gap-2">
-                  {[0.1, 0.5, 1].map((pct) => {
-                    const active = slippagePct === pct;
-                    return (
-                      <button
-                        key={pct}
-                        type="button"
-                        onClick={() => setSlippagePct(pct)}
-                        className={`rounded-full px-3 py-1.5 text-[12px] ${active ? "bg-[#2200FF] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-                      >
-                        {pct}%
-                      </button>
-                    );
-                  })}
-                  <SlippageEditor value={slippagePct} onChange={setSlippagePct} />
-                </div>
-              </div>
+          <div className="mt-4">
+            <div className="mb-2 text-[14px] text-gray-600">Slippage tolerance</div>
+            <div className="flex flex-wrap gap-2">
+              {[0.1, 0.5, 1].map((pct) => {
+                const active = slippagePct === pct;
+                return (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setSlippagePct(pct)}
+                    className={`rounded-full px-3 py-1.5 text-[12px] ${active ? "bg-[#2200FF] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                  >
+                    {pct}%
+                  </button>
+                );
+              })}
+              <SlippageEditor value={slippagePct} onChange={setSlippagePct} />
+            </div>
+          </div>
             </>
           )}
         </section>
@@ -740,7 +768,20 @@ export default function SwapPage() {
           hint={isOfframping ? `We're finalizing your offramp of ${amount ? parseFloat(amount.replace(/,/g, "")).toLocaleString() : ""} ${fromAsset?.symbol ?? ""} to NGN. This won't take long.` : "Please keep this open while we confirm."}
           progress={progress}
         />
-        <TxSuccessModal open={successOpen} onClose={()=>setSuccessOpen(false)} onViewReceipt={()=>setSuccessOpen(false)} />
+        <TxSuccessModal 
+          open={successOpen} 
+          onClose={() => setSuccessOpen(false)} 
+          onViewReceipt={() => {
+            setSuccessOpen(false);
+            setReceiptOpen(true);
+          }} 
+        />
+        
+        <OfframpReceiptModal 
+          open={receiptOpen} 
+          onClose={() => setReceiptOpen(false)} 
+          receipt={offrampReceipt} 
+        />
         <TxFailedModal open={failedOpen} onClose={()=>setFailedOpen(false)} onRetry={()=>{ setFailedOpen(false); setConfirmOpen(true); }} />
         
         <style jsx global>{`
@@ -834,7 +875,8 @@ export default function SwapPage() {
               <>
                 <div className="divide-y divide-gray-100 rounded-2xl overflow-hidden">
                   {linkedAccounts.map((account) => {
-                    const bankName = getBankNameByCode(account.bankCode) || account.bankName;
+                    // Use bankName directly from API response
+                    const bankName = account.bankName;
                     return (
                       <button
                         key={account.id}
@@ -865,7 +907,7 @@ export default function SwapPage() {
                             }, 120);
                             
                             // Create order
-                            await createOrder({
+                            const response = await createOrder({
                               tokenSymbol: fromAsset.symbol.toUpperCase(),
                               tokenAddress: tokenAddress,
                               amount: amount.replace(/,/g, ""),
@@ -874,6 +916,21 @@ export default function SwapPage() {
                               accountId: account.id,
                               memo: "From HODL Technologies LTD",
                             });
+                            
+                            // Store receipt data
+                            if (response) {
+                              setOfframpReceipt({
+                                id: response.id,
+                                transactionNo: response.transactionNo,
+                                transactionHash: response.transactionHash,
+                                amount: response.amount,
+                                remark: response.remark,
+                                status: response.status,
+                                createdAt: response.createdAt,
+                                receiver: response.receiver,
+                                walletType: response.walletType,
+                              });
+                            }
                             
                             // Complete progress and show success
                             window.clearInterval(t);
@@ -891,9 +948,7 @@ export default function SwapPage() {
                         disabled={isCreatingOrder}
                         className="flex w-full items-center gap-3 bg-white px-3 py-3 text-left hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                          <Image src={getBankLogo(account.bankCode, bankName)} alt={bankName} width={24} height={24} />
-                        </span>
+                        <Image src={getBankLogo(account.bankCode, bankName)} alt={bankName} width={44} height={44} className="rounded-full" />
                         <div className="flex-1">
                           <div className="text-[16px] font-semibold">{account.accountName}</div>
                           <div className="text-[12px] text-gray-600">{account.accountNumber} <span className="mx-1">|</span> {bankName}</div>

@@ -13,8 +13,25 @@ export interface CreateOfframpOrderRequest {
 
 export interface CreateOfframpOrderResponse {
   id: string;
+  collateralAssets: string[];
+  transactionType: string;
+  remark: string;
+  transactionNo: string;
+  transactionHash: string;
+  walletType: string;
+  user: {
+    id: string;
+  };
+  receiver: {
+    name: string;
+    accountNumber: string;
+    bankName: string;
+    currency: string;
+  };
+  amount: string;
   status: string;
-  [key: string]: any;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const createOfframpOrderFn = async (

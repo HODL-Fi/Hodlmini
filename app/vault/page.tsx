@@ -658,7 +658,7 @@ function VaultPageInner() {
         />
       </section>
 
-      {/* Quick actions: Deposit / Withdraw */}
+      {/* Quick actions: Deposit / Borrow / Repay / Withdraw */}
       <section className="mt-4">
         <QuickActions
           items={React.useMemo(() => ([
@@ -666,6 +666,8 @@ function VaultPageInner() {
               setAssetPickerMode("deposit");
               setAssetPickerOpen(true);
             } },
+            { key: "borrow", iconSrc: "/icons/arrow-down-right.svg", label: "Borrow", href: "/borrow" },
+            { key: "repay", iconSrc: "/icons/arrow-down-tray.svg", label: "Repay", href: "/repayments" },
             { key: "withdraw", iconSrc: "/icons/arrow-up-right.svg", label: "Withdraw", onClick: () => {
               setAssetPickerMode("withdraw");
               setAssetPickerOpen(true);
