@@ -26,6 +26,10 @@ import { CHAIN_IDS } from "@/utils/constants/chainIds";
 import { CNGN_BASE_ADDRESS, CNGN_DECIMALS } from "@/utils/constants/cngn";
 import { useNgnConversion } from "@/hooks/useNgnConversion";
 import { getTokenDecimals } from "@/utils/constants/tokenDecimals";
+import useGetLinkedAccounts from "@/hooks/settings/useGetLinkedAccounts";
+import { getBankNameByCode, getBankLogo } from "@/utils/banks/bankLogos";
+import useGetSupportedInstitutions from "@/hooks/offramp/useGetSupportedInstitutions";
+import useGetUserProfile from "@/hooks/user/useGetUserProfile";
 
 export default function BorrowPage() {
   return (
@@ -44,20 +48,22 @@ function BorrowPageInner() {
   const isExistingMode = modeParam === "existing";
   const assets = React.useMemo(() => ([
     // Static metadata only; all financial values come from live data elsewhere.
-    { symbol: "ETH",  name: "Ethereum",      icon: "/assets/eth.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    { symbol: "WETH", name: "Wrapped ETH",   icon: "/assets/weth.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    { symbol: "DAI",  name: "DAI",           icon: "/assets/dai.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    // MVP: Only cNGN for borrowing
+    // { symbol: "ETH",  name: "Ethereum",      icon: "/assets/eth.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    // { symbol: "WETH", name: "Wrapped ETH",   icon: "/assets/weth.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    // { symbol: "DAI",  name: "DAI",           icon: "/assets/dai.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
     { symbol: "cNGN", name: "compliant NGN", icon: "/assets/cngn.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    { symbol: "WKC",  name: "Wikicat",       icon: "/assets/wkc.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    { symbol: "USDT", name: "Tether",        icon: "/assets/usdt.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    { symbol: "USDC", name: "USD Coin",      icon: "/assets/usdc.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    { symbol: "BNB",  name: "BNB",           icon: "/assets/bnb.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    // { symbol: "WKC",  name: "Wikicat",       icon: "/assets/wkc.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    // { symbol: "USDT", name: "Tether",        icon: "/assets/usdt.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    // { symbol: "USDC", name: "USD Coin",      icon: "/assets/usdc.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
+    // { symbol: "BNB",  name: "BNB",           icon: "/assets/bnb.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
   ]), []);
   const fiats = React.useMemo(() => ([
+    // MVP: Only NGN and cNGN for borrowing
     { code: "NGN",  name: "Nigerian Naira",            icon: "/fiat/ngn.svg" },
-    { code: "GHC",  name: "Ghanian Cedi",              icon: "/fiat/ghs.svg" },
-    { code: "KHS",  name: "Kenyan Shillings",          icon: "/fiat/khs.svg" },
-    { code: "ZAR",  name: "South African Rand",        icon: "/fiat/zar.svg" },
+    // { code: "GHC",  name: "Ghanian Cedi",              icon: "/fiat/ghs.svg" },
+    // { code: "KHS",  name: "Kenyan Shillings",          icon: "/fiat/khs.svg" },
+    // { code: "ZAR",  name: "South African Rand",        icon: "/fiat/zar.svg" },
     { code: "cNGN", name: "compliant NGN (on-chain)",  icon: "/assets/cngn.svg" },
   ]), []);
 
@@ -76,12 +82,55 @@ function BorrowPageInner() {
   const [failedOpen, setFailedOpen] = React.useState(false);
   const [confirmProgress, setConfirmProgress] = React.useState(0);
   const [bankOpen, setBankOpen] = React.useState(false);
-  const bankAccounts = React.useMemo<BankAccount[]>(() => ([
-    { id: "uba-1", name: "Zeebriya Jasper", number: "0123498765", bank: "United Bank for Africa", logo: "/banks/uba.svg" },
-    { id: "fbn-2", name: "Zeebriya Jasper Hernandes", number: "0123498765", bank: "First Bank", logo: "/banks/fbn.svg" },
-    { id: "rvn-3", name: "Zeebriya Jasper", number: "3498760125", bank: "Raven Bank", logo: "/banks/bank.svg" },
-  ]), []);
+  
+  // Get user profile to determine currency
+  const { data: profile } = useGetUserProfile();
+  const currency = React.useMemo(() => {
+    if (profile?.country?.toLowerCase() === "ng") {
+      return "NGN";
+    }
+    return "NGN";
+  }, [profile?.country]);
+  
+  // Get linked bank accounts from API
+  const { data: linkedAccounts, isLoading: isLoadingLinkedAccounts } = useGetLinkedAccounts();
+  const { data: institutionsData } = useGetSupportedInstitutions(currency);
+  
+  // Create a map from Swift code to bank name for lookup
+  const swiftCodeToNameMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    if (institutionsData?.institutions) {
+      institutionsData.institutions.forEach((institution) => {
+        map.set(institution.code.toUpperCase(), institution.name);
+      });
+    }
+    return map;
+  }, [institutionsData]);
+  
+  // Map API response to BankAccount format
+  const bankAccounts = React.useMemo<BankAccount[]>(() => {
+    if (!linkedAccounts) return [];
+    
+    return linkedAccounts.map((account) => {
+      const bankName = swiftCodeToNameMap.get(account.bankCode.toUpperCase()) || account.bankName;
+      return {
+        id: account.id,
+        name: account.accountName,
+        number: account.accountNumber,
+        bank: bankName,
+        logo: getBankLogo(account.bankCode, bankName),
+      };
+    });
+  }, [linkedAccounts, swiftCodeToNameMap]);
+  
   const [selectedBankId, setSelectedBankId] = React.useState<string | null>(bankAccounts[0]?.id ?? null);
+  
+  // Update selected bank when accounts load
+  React.useEffect(() => {
+    if (bankAccounts.length > 0 && !selectedBankId) {
+      setSelectedBankId(bankAccounts[0].id);
+    }
+  }, [bankAccounts, selectedBankId]);
   const [collateralExpanded, setCollateralExpanded] = React.useState(true);
   const listRef = React.useRef<HTMLDivElement>(null);
   const [showTopShadow, setShowTopShadow] = React.useState(false);
@@ -649,7 +698,9 @@ function BorrowPageInner() {
   }, [collateralLines, isExistingMode, existingPositions]);
   const hasCollateral = Number.isFinite(totalCollateralAmount) && totalCollateralAmount > 0;
   const isOverMax = hasReceive && maxLendForCollateral > 0 && receiveNumeric > maxLendForCollateral;
-  const canBorrow = hasCollateral && hasReceive && !isOverMax;
+  // For NGN borrowing, also require a linked bank account
+  const hasBankAccount = selectedFiat.code === "NGN" ? (bankAccounts.length > 0 && selectedBankId !== null) : true;
+  const canBorrow = hasCollateral && hasReceive && !isOverMax && hasBankAccount;
 
   // Rate derived from tenure (simple interest)
   const tenureRatePercent = React.useMemo(() => tenureDays * BASE_DAILY_RATE * 100, [tenureDays]);
@@ -747,6 +798,128 @@ function BorrowPageInner() {
       setSuccessOpen(true);
     } catch (e) {
       console.error("Borrow flow failed", e);
+      setConfirmingOpen(false);
+      setIsProcessingBorrow(false);
+      setFailedOpen(true);
+    }
+  }
+
+  async function handleConfirmNgnBorrow() {
+    if (!canBorrow || !selectedBankId) {
+      setSummaryOpen(false);
+      setBankOpen(false);
+      return;
+    }
+
+    setBankOpen(false);
+    setFailedOpen(false);
+    setSuccessOpen(false);
+    setIsProcessingBorrow(true);
+    setConfirmingOpen(true);
+
+    try {
+      // For new collateral mode, deposit collateral first
+      if (!isExistingMode) {
+        const lines = collateralLines
+          .map((line) => {
+            const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
+            return { symbol: line.symbol, amount: amt };
+          })
+          .filter((l) => Number.isFinite(l.amount) && l.amount > 0);
+
+        if (lines.length > 0) {
+          for (const line of lines) {
+            const resolved = resolveCollateralToken(line.symbol);
+            if (!resolved) continue;
+
+            const amountUnits = toSmallestUnits(String(line.amount), resolved.decimals);
+            if (amountUnits === "0") continue;
+
+            await depositCollateral({
+              tokenAddress: resolved.tokenAddress,
+              amount: amountUnits,
+              chainId: resolved.chainIdHex,
+            });
+          }
+        }
+      }
+
+      // Collect collateral addresses
+      const collateralAddresses = new Set<string>();
+      
+      if (isExistingMode) {
+        // From existing positions
+        if (collateralPosition.data) {
+          Object.values(collateralPosition.data).forEach((list) => {
+            (list || []).forEach((asset: CollateralPosition) => {
+              const raw = Number(asset.amount);
+              const cfNum = Number(asset.cf) || 0;
+              const addr = String(asset.address || "").toLowerCase();
+              if (!Number.isFinite(raw) || raw <= 0) return;
+              if (cfNum <= 0) return;
+              if (!addr) return;
+              collateralAddresses.add(addr);
+            });
+          });
+        }
+      } else {
+        // From new collateral lines
+        collateralLines.forEach((line) => {
+          const resolved = resolveCollateralToken(line.symbol);
+          if (resolved) {
+            collateralAddresses.add(resolved.tokenAddress);
+          }
+        });
+      }
+
+      // Convert NGN amount to cNGN units
+      // Formula: NGN amount → USD → cNGN units
+      const ngnAmount = Number.isFinite(receiveNumeric) && receiveNumeric > 0 ? receiveNumeric : 0;
+      if (ngnAmount <= 0) {
+        setConfirmingOpen(false);
+        setIsProcessingBorrow(false);
+        return;
+      }
+
+      let cngnAmount: number;
+      if (usdToNgnRate > 0 && cngnPrice > 0) {
+        // Convert NGN → USD → cNGN
+        const usdAmount = ngnAmount / usdToNgnRate;
+        cngnAmount = usdAmount / cngnPrice;
+      } else if (cngnPrice > 0) {
+        // Fallback: assume 1 NGN = 1 cNGN if rates unavailable
+        cngnAmount = ngnAmount / cngnPrice;
+      } else {
+        // Last resort: assume 1:1 ratio
+        cngnAmount = ngnAmount;
+      }
+
+      const borrowAmountUnits = toSmallestUnits(String(cngnAmount), CNGN_DECIMALS);
+      if (borrowAmountUnits === "0") {
+        setConfirmingOpen(false);
+        setIsProcessingBorrow(false);
+        return;
+      }
+
+      const tenureSeconds = tenureDays * 24 * 60 * 60;
+
+      const payload: BorrowRequest = {
+        tokenAddress: CNGN_BASE_ADDRESS,
+        amount: borrowAmountUnits,
+        chainId: "0x18", // Test chain for cNGN; adjust for your env
+        tenureSeconds,
+        collaterals: Array.from(collateralAddresses),
+        offramp: true,
+        currency: "NGN",
+        institutionId: selectedBankId,
+      };
+
+      await borrow(payload);
+      setConfirmingOpen(false);
+      setIsProcessingBorrow(false);
+      setSuccessOpen(true);
+    } catch (e) {
+      console.error("NGN Borrow flow failed", e);
       setConfirmingOpen(false);
       setIsProcessingBorrow(false);
       setFailedOpen(true);
@@ -1010,6 +1183,25 @@ function BorrowPageInner() {
 
           <div>
             <div className="text-[18px] font-semibold">To receive</div>
+            {selectedFiat.code === "NGN" && bankAccounts.length === 0 && !isLoadingLinkedAccounts && (
+              <div className="mt-2 rounded-[14px] border border-yellow-200 bg-yellow-50 px-3 py-2 text-[12px] text-yellow-800">
+                <div className="font-medium">No bank account linked</div>
+                <div className="mt-1">
+                  Please{" "}
+                  <button
+                    type="button"
+                    onClick={() => router.push("/settings/linked/add")}
+                    className="text-[#2200FF] underline underline-offset-2"
+                  >
+                    add a bank account
+                  </button>
+                  {" "}to borrow NGN.
+                </div>
+              </div>
+            )}
+            {selectedFiat.code === "NGN" && isLoadingLinkedAccounts && (
+              <div className="mt-2 text-[12px] text-gray-500">Loading bank accounts...</div>
+            )}
             <div className="mt-2">
               <CustomInput
                 value={fiatReceive}
@@ -1223,6 +1415,14 @@ function BorrowPageInner() {
               }
               return;
             }
+            // For NGN, check if user has linked accounts
+            if (bankAccounts.length === 0) {
+              // No linked accounts - show error or redirect to add account
+              setSummaryOpen(false);
+              // Could show a modal here or redirect
+              router.push("/settings/linked/add");
+              return;
+            }
             setSummaryOpen(false);
             setBankOpen(true);
           }}
@@ -1251,30 +1451,20 @@ function BorrowPageInner() {
         />
       </Modal>
 
-      {/* Bank selection step (kept, but without URL-driven fail sim) */}
+      {/* Bank selection step */}
       <BankSelectModal
         open={bankOpen}
         onClose={() => setBankOpen(false)}
         accounts={bankAccounts}
         selectedId={selectedBankId}
         onSelect={setSelectedBankId}
-        onAddBank={() => { /* route to coming soon for now */ }}
-        onConfirmBorrow={() => {
+        onAddBank={() => {
           setBankOpen(false);
-          setConfirmProgress(0);
-          setConfirmingOpen(true);
-          const start = Date.now();
-          const total = 1800;
-          const timer = window.setInterval(() => {
-            const elapsed = Date.now() - start;
-            const pct = Math.min(100, Math.round((elapsed / total) * 100));
-            setConfirmProgress(pct);
-            if (pct >= 100) {
-              window.clearInterval(timer);
-              setConfirmingOpen(false);
-              setSuccessOpen(true);
-            }
-          }, 120);
+          router.push("/settings/linked/add");
+        }}
+        onConfirmBorrow={() => {
+          // Call the actual NGN borrow handler
+          void handleConfirmNgnBorrow();
         }}
       />
 

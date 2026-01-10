@@ -98,6 +98,53 @@ function AuthPageInner() {
   });
   }, [otpModalOpen]);
 
+  const handleVerifyCode = React.useCallback(async () => {
+    if (otpCode.length !== 6) return;
+    if (!ready) {
+      setModalVariant("email");
+      setModalText("Please wait, authentication is initializing...");
+      setRequirementModalOpen(true);
+      return;
+    }
+    try {
+      await loginWithCode({ code: otpCode });
+      // The onComplete callback in useLoginWithEmail will handle the rest
+      setOtpModalOpen(false);
+    } catch (error: any) {
+      console.error("OTP verification failed:", error);
+      
+      // Extract error message from Privy error format
+      // Privy returns: {"error":"Invalid email and code combination","code":"invalid_credentials"}
+      let errorMessage = "Invalid verification code. Please try again.";
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object') {
+        // Check for Privy error format
+        if (error.error && typeof error.error === 'string') {
+          errorMessage = error.error;
+        } else if (error.message && typeof error.message === 'string') {
+          errorMessage = error.message;
+        } else if (error.response?.data?.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+      }
+      
+      // Show error modal on top of OTP modal (don't close OTP modal)
+      // User can dismiss error and correct their typo without requesting new code
+      setModalVariant("email");
+      setModalText(errorMessage);
+      setRequirementModalOpen(true);
+      
+      // Keep OTP code so user can see what they typed and correct it
+      // Focus on first input so they can easily edit
+      if (otpRefs.current?.[0]) {
+        otpRefs.current[0]?.focus();
+      }
+    }
+  }, [otpCode, ready, loginWithCode, setOtpModalOpen, setModalVariant, setModalText, setRequirementModalOpen]);
+
   const checkRequirements = () => {
     if (isSignup && (!country || !acceptedTerms)) {
       setRequirementModalOpen(true);
@@ -510,11 +557,6 @@ function AuthPageInner() {
                   return (
                     <input
                       key={i}
-                      // ref={(el) => {
-                      //   if (otpRefs.current && i >= 0 && i < 6) {
-                      //     otpRefs.current[i] = el;
-                      //   }
-                      // }}
                       ref={(el) => {
                         otpRefs.current[i] = el;
                       }}
@@ -523,19 +565,47 @@ function AuthPageInner() {
                       maxLength={1}
                       value={val}
                       onChange={(e) => {
-                        const d = e.target.value.replace(/\D/g, "").slice(0, 1);
-                        const before = otpCode.slice(0, i);
-                        const after = otpCode.slice(i + 1);
-                        const next = (before + d + after).padEnd(6, "").slice(0, 6);
-                        setOtpCode(next);
-                        if (d && i < 5 && otpRefs.current?.[i + 1]) {
-                          otpRefs.current[i + 1]?.focus();
+                        const input = e.target.value;
+                        // Extract only digits
+                        const digits = input.replace(/\D/g, "");
+                        
+                        if (digits.length > 0) {
+                          // Get the last digit entered (handles both typing and pasting)
+                          const lastDigit = digits[digits.length - 1];
+                          const before = otpCode.slice(0, i);
+                          const after = otpCode.slice(i + 1);
+                          const next = (before + lastDigit + after).padEnd(6, "").slice(0, 6);
+                          setOtpCode(next);
+                          
+                          // Auto-advance to next box if a digit was entered
+                          if (lastDigit && i < 5 && otpRefs.current?.[i + 1]) {
+                            requestAnimationFrame(() => {
+                              otpRefs.current[i + 1]?.focus();
+                            });
+                          }
+                        } else {
+                          // Clear current box
+                          const before = otpCode.slice(0, i);
+                          const after = otpCode.slice(i + 1);
+                          const next = (before + "" + after).padEnd(6, "").slice(0, 6);
+                          setOtpCode(next);
                         }
                       }}
                       onKeyDown={(e) => {
                         const isBackspace = e.key === "Backspace";
                         const isArrowLeft = e.key === "ArrowLeft";
                         const isArrowRight = e.key === "ArrowRight";
+                        const isEnter = e.key === "Enter";
+                        
+                        // Handle Enter key - trigger verify if code is complete
+                        if (isEnter) {
+                          if (otpCode.length === 6 && ready && emailState.status !== 'submitting-code') {
+                            e.preventDefault();
+                            handleVerifyCode();
+                            return;
+                          }
+                        }
+                        
                         if (isArrowLeft && i > 0 && otpRefs.current?.[i - 1]) {
                           e.preventDefault();
                           otpRefs.current[i - 1]?.focus();
@@ -564,10 +634,7 @@ function AuthPageInner() {
                         if (text.length) {
                           e.preventDefault();
                           setOtpCode(text.padEnd(6, "").slice(0, 6));
-                          const targetIndex = Math.min(text.length, 5);
-                          // if (otpRefs.current?.[targetIndex]) {
-                          //   otpRefs.current[targetIndex]?.focus();
-                          // }
+                          const targetIndex = Math.min(text.length - 1, 5);
                           requestAnimationFrame(() => {
                             otpRefs.current?.[targetIndex]?.focus();
                           });
@@ -619,52 +686,7 @@ function AuthPageInner() {
               type="button"
               disabled={!ready || otpCode.length !== 6 || emailState.status === 'submitting-code'}
               className={`w-full rounded-[14px] px-4 py-3 text-[14px] font-medium text-white cursor-pointer ${ready && otpCode.length === 6 && emailState.status !== 'submitting-code' ? "bg-[#2200FF]" : "bg-[#2200FF]/70 cursor-not-allowed"}`}
-              onClick={async () => {
-                if (otpCode.length !== 6) return;
-                if (!ready) {
-                  setModalVariant("email");
-                  setModalText("Please wait, authentication is initializing...");
-                  setRequirementModalOpen(true);
-                  return;
-                }
-                try {
-                  await loginWithCode({ code: otpCode });
-                  // The onComplete callback in useLoginWithEmail will handle the rest
-                setOtpModalOpen(false);
-                } catch (error: any) {
-                  console.error("OTP verification failed:", error);
-                  
-                  // Extract error message from Privy error format
-                  // Privy returns: {"error":"Invalid email and code combination","code":"invalid_credentials"}
-                  let errorMessage = "Invalid verification code. Please try again.";
-                  if (typeof error === 'string') {
-                    errorMessage = error;
-                  } else if (error && typeof error === 'object') {
-                    // Check for Privy error format
-                    if (error.error && typeof error.error === 'string') {
-                      errorMessage = error.error;
-                    } else if (error.message && typeof error.message === 'string') {
-                      errorMessage = error.message;
-                    } else if (error.response?.data?.error) {
-                      errorMessage = error.response.data.error;
-                    } else if (error.response?.data?.message) {
-                      errorMessage = error.response.data.message;
-                    }
-                  }
-                  
-                  // Show error modal on top of OTP modal (don't close OTP modal)
-                  // User can dismiss error and correct their typo without requesting new code
-                  setModalVariant("email");
-                  setModalText(errorMessage);
-                  setRequirementModalOpen(true);
-                  
-                  // Keep OTP code so user can see what they typed and correct it
-                  // Focus on first input so they can easily edit
-                  if (otpRefs.current?.[0]) {
-                    otpRefs.current[0]?.focus();
-                  }
-                }
-              }}
+              onClick={handleVerifyCode}
             >
               {emailState.status === 'submitting-code' ? "Verifying..." : "Verify"}
             </button>

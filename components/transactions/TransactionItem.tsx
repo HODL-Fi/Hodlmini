@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 export type TransactionStatus = "success" | "failed" | "pending";
-export type TransactionType = "borrow" | "repay" | "earn" | "add" | "convert" | "send" | "receive" | "swap" | "deposit" | "withdraw";
+export type TransactionType = "borrow" | "repay" | "earn" | "add" | "convert" | "send" | "receive" | "swap" | "deposit" | "withdraw" | "offramp";
 
 export type TransactionItemProps = {
   id: string;
@@ -39,6 +39,7 @@ const typeToDefaults: Record<TransactionType, { title: string; Icon: React.Compo
   swap: { title: "Swap", Icon: RefreshCw },
   deposit: { title: "Deposit", Icon: ArrowDownCircle },
   withdraw: { title: "Withdraw", Icon: ArrowUpCircle },
+  offramp: { title: "Off-ramp", Icon: ArrowUpCircle },
 };
 
 export default function TransactionItem({ id, title, type, amount, timestamp, status = "success", iconSrc, tokenLogo, href }: TransactionItemProps) {

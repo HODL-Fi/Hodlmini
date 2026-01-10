@@ -63,6 +63,8 @@ export default function TransactionsFilterSheet({ open, onClose, onApply, defaul
             {chip(types.includes("repay"), "Loan repaid", () => toggle(types, "repay", setTypes))}
             {chip(types.includes("deposit"), "Deposit", () => toggle(types, "deposit", setTypes))}
             {chip(types.includes("withdraw"), "Withdraw", () => toggle(types, "withdraw", setTypes))}
+            {chip(types.includes("swap"), "Swap", () => toggle(types, "swap", setTypes))}
+            {chip(types.includes("offramp"), "Off-ramp", () => toggle(types, "offramp", setTypes))}
           </div>
         </section>
 

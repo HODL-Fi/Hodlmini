@@ -16,8 +16,8 @@ export const useTokenPrices = (tokens: TokenPriceRequest[]) => {
     queryKey: ["tokenPrices", tokensKey],
     queryFn: () => fetchTokenPrices(tokens),
     enabled: tokens.length > 0,
-    // cache for 30s but don't poll; caller can refetch on demand if needed
-    staleTime: 30_000,
+    // Data freshness: from 120 sec - cache for 120s
+    staleTime: 120_000,
     refetchInterval: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

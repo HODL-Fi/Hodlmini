@@ -171,8 +171,8 @@ export default function AddLinkedAccountPage() {
             </button>
           </div>
           {accountName && (
-            <div>
-              <div className="text-[14px] text-gray-600">Account name</div>
+          <div>
+            <div className="text-[14px] text-gray-600">Account name</div>
               <div className="mt-2 flex w-full items-center justify-between rounded-[14px] border border-gray-200 bg-gray-50 px-3 py-3 text-[16px]">
                 {accountName}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -187,7 +187,7 @@ export default function AddLinkedAccountPage() {
           {error && (
             <div className="rounded-[14px] border border-red-200 bg-red-50 px-3 py-3 text-[14px] text-red-700">
               {error}
-            </div>
+          </div>
           )}
         </section>
 
@@ -240,8 +240,8 @@ export default function AddLinkedAccountPage() {
                     className="flex w-full items-center gap-3 bg-white px-3 py-3 text-left hover:bg-gray-50"
                   >
                     <Image src={getBankLogo(b.code, b.name)} alt={b.name} width={24} height={24} />
-                    <div className="text-[14px]">{b.name}</div>
-                  </button>
+                  <div className="text-[14px]">{b.name}</div>
+                </button>
                 ))
               )}
             </div>

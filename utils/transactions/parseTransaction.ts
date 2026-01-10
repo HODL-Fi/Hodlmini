@@ -2,7 +2,7 @@ import { TxHistory } from "@/hooks/user/useGetUserTxHistory";
 import { CNGN_BASE_ADDRESS } from "@/utils/constants/cngn";
 import { getTokenDecimals, ETHER_ADDRESS } from "@/utils/constants/tokenDecimals";
 
-export type ParsedTransactionType = "borrow" | "repay" | "deposit" | "withdraw";
+export type ParsedTransactionType = "borrow" | "repay" | "deposit" | "withdraw" | "swap" | "offramp";
 export type ParsedTransactionStatus = "success" | "pending" | "failed";
 
 export interface ParsedTransaction {
@@ -24,6 +24,7 @@ export interface ParsedTransaction {
     name: string;
     accountNumber: string;
     bankName: string;
+    currency?: string;
   };
 }
 
@@ -64,6 +65,14 @@ export function determineTransactionType(
     return "withdraw";
   }
   
+  if (transactionType === "SWAP") {
+    // Check if it's an offramp transaction
+    if (remark.toLowerCase().includes("off-ramp") || remark.toLowerCase().includes("offramp")) {
+      return "offramp";
+    }
+    return "swap";
+  }
+  
   // Fallback
   return "deposit";
 }
@@ -85,17 +94,27 @@ export function parseTransaction(
   tx: TxHistory,
   tokenMetadata?: { symbol?: string | null; decimals?: number | null; name?: string | null }
 ): ParsedTransaction {
-  let tokenAddress = extractTokenAddress(tx.remark);
+  // For offramp transactions, get token address from collateralAssets
+  let tokenAddress: string | null = null;
+  if (tx.transactionType === "SWAP" && tx.collateralAssets && tx.collateralAssets.length > 0) {
+    tokenAddress = tx.collateralAssets[0].toLowerCase();
+  } else {
+    tokenAddress = extractTokenAddress(tx.remark);
+  }
+  
   const type = determineTransactionType(tx.transactionType, tx.remark);
   const status = normalizeStatus(tx.status);
   
-  // Check if this is Ether (special address)
+  // Check if this is Ether (special address) or cNGN
   let tokenSymbol = tokenMetadata?.symbol ?? null;
   if (tokenAddress) {
     const normalizedAddr = tokenAddress.toLowerCase().trim();
     const etherAddr = ETHER_ADDRESS.toLowerCase();
+    const cngnAddr = CNGN_BASE_ADDRESS.toLowerCase();
     if (normalizedAddr === etherAddr) {
       tokenSymbol = "ETH";
+    } else if (normalizedAddr === cngnAddr) {
+      tokenSymbol = "CNGN";
     }
   }
   
@@ -107,8 +126,9 @@ export function parseTransaction(
   );
   
   // Normalize amount
+  // For offramp transactions, amount is already in human-readable format (no decimals needed)
   const rawAmount = Number(tx.amount) || 0;
-  const normalizedAmount = rawAmount / (10 ** decimals);
+  const normalizedAmount = type === "offramp" ? rawAmount : rawAmount / (10 ** decimals);
   
   return {
     id: String(tx.id),

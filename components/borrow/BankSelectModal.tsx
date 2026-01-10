@@ -42,32 +42,39 @@ export default function BankSelectModal({ open, onClose, accounts, selectedId, o
           </button>
         </div>
 
-        <div className="divide-y divide-gray-100 rounded-2xl overflow-hidden bg-white">
-          {accounts.map((acc) => {
-            const active = acc.id === selectedId;
-            return (
-              <button
-                key={acc.id}
-                type="button"
-                onClick={() => onSelect(acc.id)}
-                className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 cursor-pointer"
-              >
-                <Image src={acc.logo || "/banks/bank.svg"} alt={acc.bank} width={44} height={44} className="rounded-full" />
-                <div className="flex-1">
-                  <div className="text-[18px] font-medium leading-6 text-gray-900">{acc.name}</div>
-                  <div className="mt-0.5 text-[12px] leading-4 text-gray-600">{acc.number} <span className="mx-1">|</span> {acc.bank}</div>
-                </div>
-                <span className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: active ? "#16a34a" : "#d1d5db", background: active ? "#ecfdf5" : "transparent" }}>
-                  {active ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  ) : null}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {accounts.length === 0 ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
+            <div className="text-[16px] font-medium text-gray-900">No bank accounts</div>
+            <div className="mt-2 text-[14px] text-gray-600">Please add a bank account to continue</div>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100 rounded-2xl overflow-hidden bg-white">
+            {accounts.map((acc) => {
+              const active = acc.id === selectedId;
+              return (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => onSelect(acc.id)}
+                  className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 cursor-pointer"
+                >
+                  <Image src={acc.logo || "/banks/bank.svg"} alt={acc.bank} width={44} height={44} className="rounded-full" />
+                  <div className="flex-1">
+                    <div className="text-[18px] font-medium leading-6 text-gray-900">{acc.name}</div>
+                    <div className="mt-0.5 text-[12px] leading-4 text-gray-600">{acc.number} <span className="mx-1">|</span> {acc.bank}</div>
+                  </div>
+                  <span className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: active ? "#16a34a" : "#d1d5db", background: active ? "#ecfdf5" : "transparent" }}>
+                    {active ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <button
           type="button"

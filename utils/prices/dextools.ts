@@ -14,6 +14,59 @@ export interface TokenPriceRequest {
 
 const DEXTOOLS_BASE_URL = "https://public-api.dextools.io/trial";
 
+// Rate limiter: 1 request per second, 1 concurrent request
+type QueuedRequest<T> = {
+  fn: () => Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: any) => void;
+};
+
+class RateLimiter {
+  private queue: QueuedRequest<any>[] = [];
+  private processing = false;
+  private lastRequestTime = 0;
+  private readonly minDelay = 1000; // 1 second between requests
+
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.queue.push({ fn, resolve, reject });
+      this.processQueue();
+    });
+  }
+
+  private async processQueue() {
+    if (this.processing || this.queue.length === 0) {
+      return;
+    }
+
+    this.processing = true;
+
+    while (this.queue.length > 0) {
+      const now = Date.now();
+      const timeSinceLastRequest = now - this.lastRequestTime;
+      
+      // Wait if needed to maintain 1 req/sec rate
+      if (timeSinceLastRequest < this.minDelay) {
+        await new Promise(resolve => setTimeout(resolve, this.minDelay - timeSinceLastRequest));
+      }
+
+      const item = this.queue.shift()!;
+      this.lastRequestTime = Date.now();
+
+      try {
+        const result = await item.fn();
+        item.resolve(result);
+      } catch (error) {
+        item.reject(error);
+      }
+    }
+
+    this.processing = false;
+  }
+}
+
+const rateLimiter = new RateLimiter();
+
 const getApiKey = () => {
   const key = process.env.NEXT_PUBLIC_DEXTOOLS_API_KEY;
   if (!key) {
@@ -22,7 +75,7 @@ const getApiKey = () => {
   return key;
 };
 
-export async function fetchTokenPrice(
+async function fetchTokenPriceInternal(
   { chain, address }: TokenPriceRequest
 ): Promise<TokenPriceResult> {
   const res = await fetch(
@@ -50,23 +103,30 @@ export async function fetchTokenPrice(
   };
 }
 
+export async function fetchTokenPrice(
+  request: TokenPriceRequest
+): Promise<TokenPriceResult> {
+  return rateLimiter.execute(() => fetchTokenPriceInternal(request));
+}
+
 export async function fetchTokenPrices(
   tokens: TokenPriceRequest[]
 ): Promise<Record<string, TokenPriceResult>> {
   if (tokens.length === 0) return {};
 
-  const results = await Promise.all(
-    tokens.map(async (t) => {
-      const key = `${t.chain}:${t.address.toLowerCase()}`;
-      try {
-        const price = await fetchTokenPrice(t);
-        return [key, price] as const;
-      } catch {
-        // On failure, surface a zeroed price instead of breaking the whole query
-        return [key, { price: 0, price24h: 0, variation24h: 0 }] as const;
-      }
-    })
-  );
+  // Process sequentially to respect rate limits (1 req/sec, 1 concurrent)
+  const results: [string, TokenPriceResult][] = [];
+  
+  for (const t of tokens) {
+    const key = `${t.chain}:${t.address.toLowerCase()}`;
+    try {
+      const price = await fetchTokenPrice(t);
+      results.push([key, price]);
+    } catch {
+      // On failure, surface a zeroed price instead of breaking the whole query
+      results.push([key, { price: 0, price24h: 0, variation24h: 0 }]);
+    }
+  }
 
   return Object.fromEntries(results);
 }
@@ -88,7 +148,7 @@ export interface TokenMetadata {
   decimals: number;
 }
 
-export async function fetchTokenMetadata(
+async function fetchTokenMetadataInternal(
   { chain, address }: TokenPriceRequest
 ): Promise<TokenMetadata | null> {
   try {
@@ -123,6 +183,12 @@ export async function fetchTokenMetadata(
   } catch {
     return null;
   }
+}
+
+export async function fetchTokenMetadata(
+  request: TokenPriceRequest
+): Promise<TokenMetadata | null> {
+  return rateLimiter.execute(() => fetchTokenMetadataInternal(request));
 }
 
 

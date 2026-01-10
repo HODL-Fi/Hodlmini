@@ -25,18 +25,19 @@ export const useTokenMetadataBatch = (tokens: TokenPriceRequest[]) => {
     queryFn: async () => {
       if (tokens.length === 0) return {};
 
-      const results = await Promise.all(
-        tokens.map(async (token) => {
-          const key = makeDextoolsPriceKey(token.chain, token.address);
-          const metadata = await fetchTokenMetadata(token);
-          return [key, metadata] as const;
-        })
-      );
+      // Process sequentially to respect rate limits (1 req/sec, 1 concurrent)
+      const results: [string, TokenMetadata | null][] = [];
+      
+      for (const token of tokens) {
+        const key = makeDextoolsPriceKey(token.chain, token.address);
+        const metadata = await fetchTokenMetadata(token);
+        results.push([key, metadata]);
+      }
 
       return Object.fromEntries(results);
     },
     enabled: tokens.length > 0,
-    staleTime: Infinity,
+    staleTime: Infinity, // Token metadata rarely changes
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

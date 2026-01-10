@@ -29,16 +29,16 @@ export default function LogoutModal({ open, onClose, onConfirm }: {
           <button
             type="button"
             className="w-1/2 rounded-[18px] bg-gray-200 px-4 py-3 text-[14px] font-semibold text-gray-800 cursor-pointer"
-            onClick={() => { onConfirm?.(); onClose(); }}
+            onClick={onClose}
           >
-            Yes, logout
+            No, cancel
           </button>
           <button
             type="button"
             className="w-1/2 rounded-[18px] bg-[#EF4444] px-4 py-3 text-[14px] font-semibold text-white cursor-pointer"
-            onClick={onClose}
+            onClick={() => { onConfirm?.(); onClose(); }}
           >
-            No, cancel
+            Yes, logout
           </button>
         </div>
       </div>

@@ -120,9 +120,11 @@ export default function VerificationPage() {
                 <div className="text-[12px] text-gray-600">Verify your identity with your National Identification Number (NIN) and Bank Verification Number (BVN). Required for basic transactions.</div>
                 {chip(tier1)}
               </div>
-              <div className="mt-2">
-                <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier1(true); setTier1("in_progress"); }}>Start</button>
-              </div>
+              {tier1 !== "verified" && (
+                <div className="mt-2">
+                  <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier1(true); setTier1("in_progress"); }}>Start</button>
+                </div>
+              )}
             </TierCard>
           )}
 
@@ -131,9 +133,11 @@ export default function VerificationPage() {
               <div className="text-[12px] text-gray-600">Upload a valid government-issued ID (driver's license, passport, or national ID) and complete a liveness selfie check for enhanced security.</div>
               {chip(tier2)}
             </div>
-            <div className="mt-2">
-              <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier2(true); setTier2("in_progress"); }}>Start</button>
-            </div>
+            {tier2 !== "verified" && (
+              <div className="mt-2">
+                <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier2(true); setTier2("in_progress"); }}>Start</button>
+              </div>
+            )}
           </TierCard>
 
           <TierCard title="Premium" desc="Tier 3 - Proof of address and source of funds" status={tier3}>
@@ -141,9 +145,11 @@ export default function VerificationPage() {
               <div className="text-[12px] text-gray-600">Upload a recent utility bill as proof of address and provide details about your source of funds. Optional location verification available.</div>
               {chip(tier3)}
             </div>
-            <div className="mt-2">
-              <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier3(true); setTier3("in_progress"); }}>Start</button>
-            </div>
+            {tier3 !== "verified" && (
+              <div className="mt-2">
+                <button type="button" className="rounded-[14px] bg-[#2200FF] px-4 py-2 text-[14px] font-medium text-white" onClick={()=>{ setOpenTier3(true); setTier3("in_progress"); }}>Start</button>
+              </div>
+            )}
           </TierCard>
         </section>
       </main>

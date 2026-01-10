@@ -3,7 +3,7 @@ import { getFetch2 } from "@/utils/api/fetch";
 
 export interface TxHistory {
   id: string;
-  transactionType: "BORROW" | "DEPOSIT" | "WITHDRAW";
+  transactionType: "BORROW" | "DEPOSIT" | "WITHDRAW" | "SWAP";
   remark: string;
   transactionHash: string;
   amount: string;
@@ -12,10 +12,12 @@ export interface TxHistory {
   createdAt: string;
   updatedAt: string;
   transactionNo?: string;
+  collateralAssets?: string[];
   receiver?: {
     name: string;
     accountNumber: string;
     bankName: string;
+    currency?: string;
   };
 }
 

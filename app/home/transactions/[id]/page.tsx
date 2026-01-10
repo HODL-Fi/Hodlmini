@@ -20,6 +20,8 @@ import { CNGN_BASE_ADDRESS } from "@/utils/constants/cngn";
 import { isCngnToken } from "@/utils/transactions/parseTransaction";
 import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
 import { LOCAL_TOKEN_ICONS } from "@/utils/constants/localTokenIcons";
+import { getBankNameByCode } from "@/utils/banks/bankLogos";
+import { getBankLogo } from "@/utils/banks/bankLogos";
 
 function Row({ left, right }: { left: string; right: string }) {
   return (
@@ -96,11 +98,20 @@ export default function TransactionDetailPage() {
   // Build price token request for this transaction (including metadata)
   const priceTokens = React.useMemo(() => {
     if (!transaction) return [];
-    const addressPattern = /0x[a-fA-F0-9]{40}/;
-    const match = transaction.remark.match(addressPattern);
-    if (!match) return [];
+    
+    // For offramp transactions, get token address from collateralAssets
+    let address: string | null = null;
+    if (transaction.transactionType === "SWAP" && transaction.collateralAssets && transaction.collateralAssets.length > 0) {
+      address = transaction.collateralAssets[0].toLowerCase();
+    } else {
+      const addressPattern = /0x[a-fA-F0-9]{40}/;
+      const match = transaction.remark.match(addressPattern);
+      if (!match) return [];
+      address = match[0].toLowerCase();
+    }
+    
+    if (!address) return [];
 
-    const address = match[0].toLowerCase();
     const dextoolsChain = mapHexChainIdToDextools(transaction.walletType);
     if (!dextoolsChain) return [];
 
@@ -122,10 +133,15 @@ export default function TransactionDetailPage() {
   const parsedTx = React.useMemo<ParsedTransaction | null>(() => {
     if (!transaction) return null;
 
-    // Extract token address
-    const addressPattern = /0x[a-fA-F0-9]{40}/;
-    const match = transaction.remark.match(addressPattern);
-    const tokenAddress = match ? match[0].toLowerCase() : null;
+    // Extract token address - for offramp, use collateralAssets
+    let tokenAddress: string | null = null;
+    if (transaction.transactionType === "SWAP" && transaction.collateralAssets && transaction.collateralAssets.length > 0) {
+      tokenAddress = transaction.collateralAssets[0].toLowerCase();
+    } else {
+      const addressPattern = /0x[a-fA-F0-9]{40}/;
+      const match = transaction.remark.match(addressPattern);
+      tokenAddress = match ? match[0].toLowerCase() : null;
+    }
 
     // Get token metadata
     let metadata: { symbol?: string | null; decimals?: number | null; name?: string | null } = {};
@@ -262,6 +278,7 @@ export default function TransactionDetailPage() {
 
   const [reportOpen, setReportOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
+  const [isSharing, setIsSharing] = React.useState(false);
   const receiptRef = React.useRef<HTMLDivElement | null>(null);
 
   async function shareAsImage() {
@@ -270,6 +287,9 @@ export default function TransactionDetailPage() {
         console.warn("[shareAsImage] receiptRef is null");
         return;
       }
+      setIsSharing(true);
+      // Wait for state update to reflect in DOM
+      await new Promise(resolve => setTimeout(resolve, 100));
       const { toBlob } = await import("html-to-image");
       const node = receiptRef.current;
       const width = node.scrollWidth;
@@ -319,6 +339,7 @@ export default function TransactionDetailPage() {
     } catch (err) {
       console.error("[shareAsImage] error", err);
     } finally {
+      setIsSharing(false);
       setShareOpen(false);
     }
   }
@@ -329,6 +350,9 @@ export default function TransactionDetailPage() {
         console.warn("[shareAsPdf] receiptRef is null");
         return;
       }
+      setIsSharing(true);
+      // Wait for state update to reflect in DOM
+      await new Promise(resolve => setTimeout(resolve, 100));
       const { toCanvas } = await import("html-to-image");
       const node = receiptRef.current;
       const width = node.scrollWidth;
@@ -382,6 +406,7 @@ export default function TransactionDetailPage() {
     } catch (err) {
       console.error("[shareAsPdf] error", err);
     } finally {
+      setIsSharing(false);
       setShareOpen(false);
     }
   }
@@ -471,7 +496,7 @@ export default function TransactionDetailPage() {
         </div>
 
         <div className="mt-6 space-y-6">
-          <Row left="Transaction type" right={type === "borrow" ? "Money borrowed" : type === "repay" ? "Loan repaid" : type === "deposit" ? "Deposit" : "Withdraw"} />
+          <Row left="Transaction type" right={type === "borrow" ? "Money borrowed" : type === "repay" ? "Loan repaid" : type === "deposit" ? "Deposit" : type === "withdraw" ? "Withdraw" : type === "offramp" ? "Off-ramp" : "Swap"} />
           {(parsedTx.tokenSymbol || parsedTx.tokenAddress) && (
             <TokenRow
               left="Token"
@@ -481,17 +506,24 @@ export default function TransactionDetailPage() {
             />
           )}
           {parsedTx.receiver && (
-            <Row
-              left={type === "borrow" ? "Receiver details" : "Sender details"}
-              right={`${parsedTx.receiver.name}\n${parsedTx.receiver.bankName}  |  ${parsedTx.receiver.accountNumber}`}
-            />
+            <div className="flex items-start justify-between gap-4">
+              <div className="text-[14px] font-medium text-gray-500">Bank account</div>
+              <div className="text-right text-[14px] whitespace-pre-line">
+                {parsedTx.receiver.name}
+                {parsedTx.receiver.bankName && `\n${getBankNameByCode(parsedTx.receiver.bankName)}`}
+                {parsedTx.receiver.accountNumber && `\n${parsedTx.receiver.accountNumber}`}
+                {parsedTx.receiver.currency && `\n${parsedTx.receiver.currency}`}
+              </div>
+            </div>
           )}
           <Row left="Remark" right={parsedTx.remark} />
           {parsedTx.transactionNo && <Row left="Transaction No." right={parsedTx.transactionNo} />}
-          <Row left="Transaction Hash" right={formatTransactionHash(parsedTx.transactionHash)} />
-          <div className="flex justify-end">
-            <CopyButton text={parsedTx.transactionHash} label="Copy hash" />
-          </div>
+          <Row left="Transaction Hash" right={isSharing ? parsedTx.transactionHash : formatTransactionHash(parsedTx.transactionHash)} />
+          {!isSharing && (
+            <div className="flex justify-end">
+              <CopyButton text={parsedTx.transactionHash} label="Copy hash" />
+            </div>
+          )}
           <Row left="Transaction date" right={date} />
           <Row left="Chain" right={parsedTx.walletType} />
         </div>

@@ -11,6 +11,8 @@ import FontSettingsModal from "@/components/settings/FontSettingsModal";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 import useGetUserProfile from "@/hooks/user/useGetUserProfile";
+import { usePrivy } from "@privy-io/react-auth";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 type Item = {
   key: string;
@@ -27,6 +29,8 @@ export default function SettingsPage() {
   const [fontSettingsOpen, setFontSettingsOpen] = React.useState(false);
   const { data: profile } = useGetUserProfile();
   const userEmail = profile?.email || "jasperjed@mail.xyz";
+  const { logout } = usePrivy();
+  const { clear } = useAuthStore();
   
   // Determine verification status
   // User is verified if they have any tier status (tier_1, tier_2, tier_3, or VERIFIED)
@@ -67,8 +71,8 @@ export default function SettingsPage() {
     { key: "font", label: "Font", icon: "/icons/font.svg" },
     { key: "help", label: "Help", icon: "/settings/help.svg", href: "/settings/help" },
     { key: "terms", label: "Terms & privacy", icon: "/settings/document.svg", href: "/settings/terms" },
-    { key: "logout", label: "Logout", icon: "/settings/power.svg" },
-    { key: "delete", label: "Delete account", icon: "/settings/trash.svg", href: "/coming-soon", danger: true },
+    { key: "logout", label: "Logout", icon: "/settings/power.svg", danger: true },
+    // { key: "delete", label: "Delete account", icon: "/settings/trash.svg", href: "/coming-soon", danger: true },
   ];
 
   return (
@@ -83,8 +87,15 @@ export default function SettingsPage() {
             const Row = (
               <div className="flex items-center justify-between px-3 py-3">
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                    <Image src={it.icon} alt="" width={20} height={20} />
+                  <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${it.danger ? "bg-red-100" : "bg-gray-100"}`}>
+                    <Image 
+                      src={it.icon} 
+                      alt="" 
+                      width={20} 
+                      height={20} 
+                      className={it.danger ? "brightness-0 saturate-100" : ""}
+                      style={it.danger ? { filter: "invert(27%) sepia(95%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)" } : undefined}
+                    />
                   </span>
                   <span className={`text-[16px] ${it.danger ? "text-red-600" : "text-gray-900"}`}>{it.label}</span>
                 </div>
@@ -123,9 +134,25 @@ export default function SettingsPage() {
         <LogoutModal
           open={logoutOpen}
           onClose={() => setLogoutOpen(false)}
-          onConfirm={() => {
-            // simulate logout
-            router.push("/home");
+          onConfirm={async () => {
+            try {
+              // Clear auth store
+              clear();
+              
+              // Remove tokens from localStorage
+              localStorage.removeItem("accessToken");
+              localStorage.removeItem("refreshToken");
+              
+              // Logout from Privy
+              await logout();
+              
+              // Redirect to auth page
+              router.push("/auth");
+            } catch (error) {
+              console.error("Logout error:", error);
+              // Still redirect even if logout fails
+              router.push("/auth");
+            }
           }}
         />
         <FontSettingsModal open={fontSettingsOpen} onClose={() => setFontSettingsOpen(false)} />

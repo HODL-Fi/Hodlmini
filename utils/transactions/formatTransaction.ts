@@ -105,7 +105,7 @@ export function formatTransactionAmountWithSign(
   convertUsdToNgn?: (usd: number) => number
 ): string {
   const amount = formatTransactionAmount(tx, tokenPriceUsd, convertUsdToNgn);
-  const isNegative = tx.type === "borrow" || tx.type === "withdraw";
+  const isNegative = tx.type === "borrow" || tx.type === "withdraw" || tx.type === "offramp";
   return isNegative ? `-${amount}` : `+${amount}`;
 }
 

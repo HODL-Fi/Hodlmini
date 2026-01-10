@@ -110,7 +110,7 @@ export default function HomeTransactionsPage() {
   }, [transactions, tokenMetadata]);
 
   // Filter state
-  const [selectedTypes, setSelectedTypes] = React.useState<string[]>(["borrow", "repay", "deposit", "withdraw"]);
+  const [selectedTypes, setSelectedTypes] = React.useState<string[]>(["borrow", "repay", "deposit", "withdraw", "swap", "offramp"]);
   const [selectedStatuses, setSelectedStatuses] = React.useState<string[]>(["success", "pending", "failed"]);
   const [selectedRange, setSelectedRange] = React.useState<string | null>(null);
 
@@ -229,9 +229,13 @@ export default function HomeTransactionsPage() {
       const amount = formatTransactionAmountWithSign(tx, tokenPriceUsd, convertUsdToNgn);
       const timestamp = formatTransactionTimestamp(tx.createdAt);
 
+      // Set title for offramp transactions
+      const title = tx.type === "offramp" ? "Off-ramp" : undefined;
+
       return {
         id: tx.id,
         type: tx.type,
+        title,
         amount,
         timestamp,
         status: tx.status,

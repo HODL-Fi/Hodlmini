@@ -374,12 +374,14 @@ export default function SwapPage() {
               tokenIconSrc={isOfframping ? "/flags/nigeria.webp" : toAsset?.icon}
               onDropdownClick={() => setToOpen(true)}
             />
-            <div className="mt-1 text-[12px] text-gray-600">
-              You receive ≈ {isOfframping ? receive.toFixed(2) : receive.toFixed(6)} {isOfframping ? "NGN" : (toAsset?.symbol ?? "")}
-              {isLoadingRate && isOfframping && (
-                <span className="ml-2 text-gray-400">(Loading rate...)</span>
-              )}
-            </div>
+            {isLoadingRate && isOfframping && (
+              <div className="mt-1 text-[12px] text-gray-400 inline-flex items-center">
+                Loading rate
+                <span className="loading-dots ml-1">
+                  <span className="dot">.</span><span className="dot">.</span><span className="dot">.</span>
+                </span>
+              </div>
+            )}
           </div>
         </section>
 
@@ -389,38 +391,60 @@ export default function SwapPage() {
             <div className="text-gray-600">Quote details</div>
             <div className="text-[12px] text-gray-500">{selectedChain.name}</div>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
-            <div className="text-gray-600">Min received</div>
-            <div className="text-right font-semibold">
-              {minReceived.toFixed(6)} {toAsset?.symbol ?? ""}
+          {isOfframping ? (
+            <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
+              <div className="text-gray-600">Amount to debit</div>
+              <div className="text-right font-semibold">
+                {(() => {
+                  const amountNum = parseFloat((amount || "0").replace(/,/g, ""));
+                  const feeAmount = amountNum * 0.001; // 0.1% fee
+                  const totalDebit = amountNum + feeAmount;
+                  return Number.isFinite(totalDebit) ? totalDebit.toFixed(6) : "0.000000";
+                })()} {fromAsset?.symbol ?? ""}
+              </div>
+              <div className="text-gray-600">You receive</div>
+              <div className="text-right font-semibold">
+                ≈ {isOfframping ? receive.toFixed(2) : receive.toFixed(6)} {isOfframping ? "NGN" : (toAsset?.symbol ?? "")}
+              </div>
+              <div className="text-gray-600">Fee</div>
+              <div className="text-right font-semibold">0.1%</div>
             </div>
-            <div className="text-gray-600">Price impact</div>
-            <div className="text-right font-semibold">{priceImpactPct.toFixed(2)}%</div>
-            <div className="text-gray-600">Network fee</div>
-            <div className="text-right font-semibold">${networkFeeUsd.toFixed(2)}</div>
-            <div className="text-gray-600">Estimated time</div>
-            <div className="text-right font-semibold">≈ 30s</div>
-          </div>
+          ) : (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
+                <div className="text-gray-600">Min received</div>
+                <div className="text-right font-semibold">
+                  {minReceived.toFixed(6)} {toAsset?.symbol ?? ""}
+                </div>
+                <div className="text-gray-600">Price impact</div>
+                <div className="text-right font-semibold">{priceImpactPct.toFixed(2)}%</div>
+                <div className="text-gray-600">Network fee</div>
+                <div className="text-right font-semibold">${networkFeeUsd.toFixed(2)}</div>
+                <div className="text-gray-600">Estimated time</div>
+                <div className="text-right font-semibold">≈ 30s</div>
+              </div>
 
-          <div className="mt-4">
-            <div className="mb-2 text-[14px] text-gray-600">Slippage tolerance</div>
-            <div className="flex flex-wrap gap-2">
-              {[0.1, 0.5, 1].map((pct) => {
-                const active = slippagePct === pct;
-                return (
-                  <button
-                    key={pct}
-                    type="button"
-                    onClick={() => setSlippagePct(pct)}
-                    className={`rounded-full px-3 py-1.5 text-[12px] ${active ? "bg-[#2200FF] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-                  >
-                    {pct}%
-                  </button>
-                );
-              })}
-              <SlippageEditor value={slippagePct} onChange={setSlippagePct} />
-            </div>
-          </div>
+              <div className="mt-4">
+                <div className="mb-2 text-[14px] text-gray-600">Slippage tolerance</div>
+                <div className="flex flex-wrap gap-2">
+                  {[0.1, 0.5, 1].map((pct) => {
+                    const active = slippagePct === pct;
+                    return (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setSlippagePct(pct)}
+                        className={`rounded-full px-3 py-1.5 text-[12px] ${active ? "bg-[#2200FF] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                      >
+                        {pct}%
+                      </button>
+                    );
+                  })}
+                  <SlippageEditor value={slippagePct} onChange={setSlippagePct} />
+                </div>
+              </div>
+            </>
+          )}
         </section>
 
         <div className="fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),8px)+64px)] z-10">
@@ -709,9 +733,42 @@ export default function SwapPage() {
             }, 120);
           }}
         />
-        <ProcessingModal open={processingOpen} onClose={()=>setProcessingOpen(false)} title="Processing swap" progress={progress} />
+        <ProcessingModal 
+          open={processingOpen} 
+          onClose={()=>setProcessingOpen(false)}
+          title={isOfframping ? "Processing offramp" : "Processing swap"}
+          hint={isOfframping ? `We're finalizing your offramp of ${amount ? parseFloat(amount.replace(/,/g, "")).toLocaleString() : ""} ${fromAsset?.symbol ?? ""} to NGN. This won't take long.` : "Please keep this open while we confirm."}
+          progress={progress}
+        />
         <TxSuccessModal open={successOpen} onClose={()=>setSuccessOpen(false)} onViewReceipt={()=>setSuccessOpen(false)} />
         <TxFailedModal open={failedOpen} onClose={()=>setFailedOpen(false)} onRetry={()=>{ setFailedOpen(false); setConfirmOpen(true); }} />
+        
+        <style jsx global>{`
+          .loading-dots {
+            display: inline-flex;
+            align-items: center;
+          }
+          .loading-dots .dot {
+            animation: dot-bounce 1.4s infinite ease-in-out both;
+            display: inline-block;
+          }
+          .loading-dots .dot:nth-child(1) {
+            animation-delay: -0.32s;
+          }
+          .loading-dots .dot:nth-child(2) {
+            animation-delay: -0.16s;
+          }
+          @keyframes dot-bounce {
+            0%, 80%, 100% {
+              opacity: 0.3;
+              transform: scale(0.8);
+            }
+            40% {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+        `}</style>
         
         {/* Offramp Info Modal */}
         <Modal open={infoModalOpen} onClose={() => setInfoModalOpen(false)}>
@@ -785,6 +842,10 @@ export default function SwapPage() {
                         onClick={async () => {
                           if (!fromAsset) return;
                           
+                          setBankSelectOpen(false);
+                          setProgress(0);
+                          setProcessingOpen(true);
+                          
                           try {
                             // Determine token address
                             let tokenAddress = fromAsset.contractAddress;
@@ -792,6 +853,18 @@ export default function SwapPage() {
                               tokenAddress = CNGN_BASE_ADDRESS;
                             }
                             
+                            // Start progress animation
+                            const start = Date.now();
+                            const total = 1800; // Similar to borrow page
+                            const t = window.setInterval(() => {
+                              const p = Math.min(
+                                100,
+                                Math.round(((Date.now() - start) / total) * 100)
+                              );
+                              setProgress(p);
+                            }, 120);
+                            
+                            // Create order
                             await createOrder({
                               tokenSymbol: fromAsset.symbol.toUpperCase(),
                               tokenAddress: tokenAddress,
@@ -802,26 +875,16 @@ export default function SwapPage() {
                               memo: "From HODL Technologies LTD",
                             });
                             
-                            setBankSelectOpen(false);
-                            setProgress(0);
-                            setProcessingOpen(true);
-                            const start = Date.now();
-                            const total = 1600;
-                            const t = window.setInterval(() => {
-                              const p = Math.min(
-                                100,
-                                Math.round(((Date.now() - start) / total) * 100)
-                              );
-                              setProgress(p);
-                              if (p >= 100) {
-                                window.clearInterval(t);
-                                setProcessingOpen(false);
-                                setSuccessOpen(true);
-                              }
-                            }, 120);
+                            // Complete progress and show success
+                            window.clearInterval(t);
+                            setProgress(100);
+                            setTimeout(() => {
+                              setProcessingOpen(false);
+                              setSuccessOpen(true);
+                            }, 300);
                           } catch (error) {
                             console.error("Failed to create offramp order:", error);
-                            setBankSelectOpen(false);
+                            setProcessingOpen(false);
                             setFailedOpen(true);
                           }
                         }}
