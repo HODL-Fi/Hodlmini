@@ -30,6 +30,7 @@ export default function SendPage() {
       { key: "BSC", name: "BNB Smart Chain", icon: "/chains/bsc.svg" },
       { key: "LSK", name: "Lisk", icon: "/chains/lisk.svg" },
       { key: "BASE", name: "Base", icon: "/chains/base.svg" },
+      { key: "MANTLE", name: "Mantle", icon: "/chains/mantle.svg" },
       { key: "TEST", name: "Test Network", icon: "/chains/test.svg" },
     ];
 

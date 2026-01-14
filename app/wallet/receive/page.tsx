@@ -17,6 +17,7 @@ export default function ReceivePage() {
       { key: "BSC", name: "BNB Smart Chain", icon: "/chains/bsc.svg" },
       { key: "LSK", name: "Lisk", icon: "/chains/lisk.svg" },
       { key: "BASE", name: "Base", icon: "/chains/base.svg" },
+      { key: "MANTLE", name: "Mantle", icon: "/chains/mantle.svg" },
       { key: "TEST", name: "Test Network", icon: "/chains/test.svg" },
     ];
 
@@ -29,7 +30,7 @@ export default function ReceivePage() {
   const evmAddress = useAuthStore((s) => s.evmAddress);
   const address = React.useMemo(() => {
     // Prefer user's EVM address for EVM-compatible networks
-    const evmChains = new Set(["ETH", "BSC", "BASE", "TEST"]);
+    const evmChains = new Set(["ETH", "BSC", "BASE", "MANTLE", "TEST"]);
     if (evmChains.has(selectedChain.key) && evmAddress) {
       return evmAddress;
     }
@@ -39,6 +40,7 @@ export default function ReceivePage() {
       BSC: "0xBEEfBEEF00001111222233334444555566667777",
       LSK: "0x1111222233334444555566667777888899990000",
       BASE: "0xABCDEFabcdefABCDEFabcdefABCDEFabcdef1234",
+      MANTLE: "0xABCDEFabcdefABCDEFabcdefABCDEFabcdef1234",
       TEST: "0x0000000000000000000000000000000000000000",
     };
     return map[selectedChain.key] || map.ETH;

@@ -12,6 +12,7 @@
 // export const BNB_Smart_Chain_Mainnet = 0x38; // 56
 // export const Lisk_Mainnet = 0x46f; // 1135   
 export const Base_Mainnet = "0x2105"; // 8453
+export const Mantle_Mainnet = "0x1388"; // 5013
 
 
 export const CHAIN_IDS = {
@@ -19,5 +20,6 @@ export const CHAIN_IDS = {
   // BSC: BNB_Smart_Chain,
   // // LSK: Lisk,
   BASE: Base_Mainnet,
+  MANTLE: Mantle_Mainnet,
   // TEST: Test,
 };

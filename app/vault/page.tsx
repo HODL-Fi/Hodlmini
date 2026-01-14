@@ -28,7 +28,7 @@ import { getTokenDecimals } from "@/utils/constants/tokenDecimals";
 
 type Position = { symbol: string; amount: number };
 
-type ChainKey = "ALL" | "ETH" | "BSC" | "LSK" | "BASE" | "TEST";
+type ChainKey = "ALL" | "ETH" | "BSC" | "LSK" | "BASE" | "MANTLE" | "TEST";
 
 type WalletAsset = {
   symbol: string;
@@ -64,6 +64,7 @@ function VaultPageInner() {
       { key: "BSC", name: "BNB Smart Chain", icon: "/chains/bsc.svg" },
       { key: "LSK", name: "Lisk", icon: "/chains/lisk.svg" },
       { key: "BASE", name: "Base", icon: "/chains/base.svg" },
+      { key: "MANTLE", name: "Mantle", icon: "/chains/mantle.svg" },
       { key: "TEST", name: "Test Network", icon: "/chains/test.svg" },
     ];
     

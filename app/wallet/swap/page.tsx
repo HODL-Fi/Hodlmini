@@ -24,7 +24,7 @@ import { CNGN_BASE_ADDRESS } from "@/utils/constants/cngn";
 import useGetSupportedInstitutions from "@/hooks/offramp/useGetSupportedInstitutions";
 import useGetUserProfile from "@/hooks/user/useGetUserProfile";
 
-type ChainKey = "ETH" | "BSC" | "LSK" | "BASE" | "TEST";
+type ChainKey = "ETH" | "BSC" | "LSK" | "BASE" | "MANTLE" | "TEST";
 
 type AssetOption = {
   symbol: string;
@@ -64,6 +64,7 @@ export default function SwapPage() {
       BSC: "0x38",
       LSK: "0x46f",
       BASE: "0x2105",
+      MANTLE: "0x1388",
       TEST: "0x18", // Test Chain
     };
     
@@ -72,6 +73,7 @@ export default function SwapPage() {
       { key: "BSC" as ChainKey, name: "BNB Smart Chain", icon: "/chains/bsc.svg" },
       { key: "LSK" as ChainKey, name: "Lisk", icon: "/chains/lisk.svg" },
       { key: "BASE" as ChainKey, name: "Base", icon: "/chains/base.svg" },
+      { key: "MANTLE" as ChainKey, name: "Mantle", icon: "/chains/mantle.svg" },
       { key: "TEST" as ChainKey, name: "Test Network", icon: "/chains/test.svg" },
     ];
     const available = allChains
