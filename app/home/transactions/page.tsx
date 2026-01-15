@@ -18,7 +18,7 @@ import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/de
 import { useNgnConversion } from "@/hooks/useNgnConversion";
 import { TransactionItemProps } from "@/components/transactions/TransactionItem";
 import { LOCAL_TOKEN_ICONS } from "@/utils/constants/localTokenIcons";
-import { CNGN_BASE_ADDRESS } from "@/utils/constants/cngn";
+import { CNGN_ADDRESSES } from "@/utils/constants/cngn";
 import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
 
 const LOCAL_ICONS = [...LOCAL_TOKEN_ICONS];
@@ -170,12 +170,25 @@ export default function HomeTransactionsPage() {
         // Check local token icons first (by symbol)
         if (tx.tokenSymbol) {
           const symbolLower = tx.tokenSymbol.toLowerCase();
-          if (LOCAL_ICONS.includes(symbolLower)) {
+          // Special case: MNT should use Mantle chain logo
+          if (symbolLower === "mnt") {
+            tokenLogo = "/chains/mantle.svg";
+          } else if (LOCAL_ICONS.includes(symbolLower)) {
             tokenLogo = `/assets/${symbolLower}.svg`;
           }
         }
 
-        // Check Ether by address
+        // Check Mantle native token (MNT) by address and chain
+        if (!tokenLogo) {
+          const normalizedAddr = tx.tokenAddress.toLowerCase();
+          const etherAddr = "0x0000000000000000000000000000000000000001";
+          const isMantleChain = tx.walletType?.toLowerCase().includes("mantle");
+          if (isMantleChain && normalizedAddr === etherAddr) {
+            tokenLogo = "/chains/mantle.svg";
+          }
+        }
+
+        // Check Ether by address (only if not Mantle)
         if (!tokenLogo) {
           const normalizedAddr = tx.tokenAddress.toLowerCase();
           const etherAddr = "0x0000000000000000000000000000000000000001";
@@ -190,8 +203,7 @@ export default function HomeTransactionsPage() {
         // Check cNGN by address if symbol didn't match
         if (!tokenLogo) {
           const normalizedAddr = tx.tokenAddress.toLowerCase();
-          const cngnAddr = CNGN_BASE_ADDRESS.toLowerCase();
-          if (normalizedAddr === cngnAddr || normalizedAddr === `0x${cngnAddr}`) {
+          if (CNGN_ADDRESSES.includes(normalizedAddr) || CNGN_ADDRESSES.some(addr => normalizedAddr === `0x${addr}`)) {
             tokenLogo = "/assets/cngn.svg";
           }
         }

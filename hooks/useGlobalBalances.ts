@@ -28,9 +28,10 @@ function normalizeAccountMetric(raw: number | string | undefined): number {
 
 export const useGlobalBalances = () => {
   // 1) Lending account values (collateral / debt / available)
-  // Fetch for all chains to get global totals
+  // Fetch for all chains to get global totals (temporarily exclude Base)
   const chainList = useMemo(() => Object.values(CHAIN_IDS), []);
-  const { data: accountValueByChain } = useGetAccountValue(chainList);
+  const accountValueChainList = useMemo(() => chainList.filter(chainId => chainId !== CHAIN_IDS.BASE), [chainList]);
+  const { data: accountValueByChain } = useGetAccountValue(accountValueChainList);
   
   // Sum account values across all chains
   const accountValue = useMemo(() => {

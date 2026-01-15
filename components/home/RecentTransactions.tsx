@@ -105,12 +105,25 @@ export default function RecentTransactions() {
         // Check local token icons first (by symbol)
         if (tx.tokenSymbol) {
           const symbolLower = tx.tokenSymbol.toLowerCase();
-          if (LOCAL_ICONS.includes(symbolLower)) {
+          // Special case: MNT should use Mantle chain logo
+          if (symbolLower === "mnt") {
+            tokenLogo = "/chains/mantle.svg";
+          } else if (LOCAL_ICONS.includes(symbolLower)) {
             tokenLogo = `/assets/${symbolLower}.svg`;
           }
         }
 
-        // Check Ether by address
+        // Check Mantle native token (MNT) by address and chain
+        if (!tokenLogo) {
+          const normalizedAddr = tx.tokenAddress.toLowerCase();
+          const etherAddr = "0x0000000000000000000000000000000000000001";
+          const isMantleChain = tx.walletType?.toLowerCase().includes("mantle");
+          if (isMantleChain && normalizedAddr === etherAddr) {
+            tokenLogo = "/chains/mantle.svg";
+          }
+        }
+
+        // Check Ether by address (only if not Mantle)
         if (!tokenLogo) {
           const normalizedAddr = tx.tokenAddress.toLowerCase();
           const etherAddr = "0x0000000000000000000000000000000000000001";

@@ -134,7 +134,9 @@ function VaultPageInner() {
   }
 
   const healthFactors = useGetHealthFactor(chainIdsToFetch);
-  const accountValue = useGetAccountValue(chainIdsToFetch);
+  // Temporarily exclude Base from account values endpoint
+  const accountValueChainIds = React.useMemo(() => chainIdsToFetch.filter(chainId => chainId !== CHAIN_IDS.BASE), [chainIdsToFetch]);
+  const accountValue = useGetAccountValue(accountValueChainIds);
 
   // Wallet balances + prices for deposit flow (and collateral positions)
   const chainList = React.useMemo(() => Object.values(CHAIN_IDS), []);

@@ -1,5 +1,5 @@
 import { TxHistory } from "@/hooks/user/useGetUserTxHistory";
-import { CNGN_BASE_ADDRESS } from "@/utils/constants/cngn";
+import { CNGN_ADDRESSES, CNGN_BASE_ADDRESS } from "@/utils/constants/cngn";
 import { getTokenDecimals, ETHER_ADDRESS } from "@/utils/constants/tokenDecimals";
 
 export type ParsedTransactionType = "borrow" | "repay" | "deposit" | "withdraw" | "swap" | "offramp";
@@ -105,15 +105,20 @@ export function parseTransaction(
   const type = determineTransactionType(tx.transactionType, tx.remark);
   const status = normalizeStatus(tx.status);
   
-  // Check if this is Ether (special address) or cNGN
+  // Check if this is Ether (special address), cNGN, or Mantle native token
   let tokenSymbol = tokenMetadata?.symbol ?? null;
   if (tokenAddress) {
     const normalizedAddr = tokenAddress.toLowerCase().trim();
     const etherAddr = ETHER_ADDRESS.toLowerCase();
-    const cngnAddr = CNGN_BASE_ADDRESS.toLowerCase();
-    if (normalizedAddr === etherAddr) {
+    const isPlaceholderAddress = normalizedAddr === etherAddr;
+    
+    // Check if this is Mantle native token (placeholder address on Mantle chain)
+    const isMantleChain = tx.walletType?.toLowerCase().includes("mantle");
+    if (isMantleChain && isPlaceholderAddress) {
+      tokenSymbol = "MNT";
+    } else if (normalizedAddr === etherAddr) {
       tokenSymbol = "ETH";
-    } else if (normalizedAddr === cngnAddr) {
+    } else if (CNGN_ADDRESSES.includes(normalizedAddr)) {
       tokenSymbol = "CNGN";
     }
   }
@@ -155,7 +160,6 @@ export function parseTransaction(
 export function isCngnToken(tokenAddress: string | null): boolean {
   if (!tokenAddress) return false;
   const normalized = tokenAddress.toLowerCase().trim();
-  const cngnAddr = CNGN_BASE_ADDRESS.toLowerCase();
-  return normalized === cngnAddr || normalized === `0x${cngnAddr}`;
+  return CNGN_ADDRESSES.includes(normalized) || CNGN_ADDRESSES.some(addr => normalized === `0x${addr}`);
 }
 

@@ -137,7 +137,9 @@ function BorrowPageInner() {
   const chainList = React.useMemo(() => Object.values(CHAIN_IDS), []);
   const { data: balancesByChain } = useGetAllChainBalances(chainList);
   const collateralPosition = useGetCollateralPosition(chainList);
-  const accountValue = useGetAccountValue(chainList);
+  // Temporarily exclude Base from account values endpoint
+  const accountValueChainList = React.useMemo(() => chainList.filter(chainId => chainId !== CHAIN_IDS.BASE), [chainList]);
+  const accountValue = useGetAccountValue(accountValueChainList);
   const { mutateAsync: depositCollateral } = useDepositCollateral();
   const { mutateAsync: borrow } = useBorrow();
   const { usdToNgnRate, cngnPrice } = useNgnConversion();

@@ -1,4 +1,4 @@
-import { CNGN_BASE_ADDRESS, CNGN_DECIMALS } from "./cngn";
+import { CNGN_BASE_ADDRESS, CNGN_ADDRESSES, CNGN_DECIMALS } from "./cngn";
 
 /**
  * Special address used to represent Ether (ETH) in transaction history
@@ -43,9 +43,8 @@ export function getKnownTokenDecimalsByAddress(address: string | null | undefine
     return 18; // ETH has 18 decimals
   }
   
-  // cNGN has a known address
-  const cngnAddr = CNGN_BASE_ADDRESS.toLowerCase();
-  if (normalizedAddr === cngnAddr) {
+  // cNGN has known addresses on multiple chains
+  if (CNGN_ADDRESSES.includes(normalizedAddr)) {
     return CNGN_DECIMALS; // 6
   }
   
