@@ -924,7 +924,7 @@ function BorrowPageInner() {
       const payload: BorrowRequest = {
         tokenAddress: CNGN_BASE_ADDRESS,
         amount: borrowAmountUnits,
-        chainId: "0x18", // Test mainnet for cNGN; adjust for your env
+        chainId: CHAIN_IDS.BASE, // Base mainnet for cNGN
         tenureSeconds,
         collaterals: Array.from(collateralAddresses),
         offramp: false,
@@ -1046,7 +1046,7 @@ function BorrowPageInner() {
       const payload: BorrowRequest = {
         tokenAddress: CNGN_BASE_ADDRESS,
         amount: borrowAmountUnits,
-        chainId: "0x18", // Test chain for cNGN; adjust for your env
+        chainId: CHAIN_IDS.BASE, // Base mainnet for cNGN
         tenureSeconds,
         collaterals: Array.from(collateralAddresses),
         offramp: true,
@@ -1108,7 +1108,7 @@ function BorrowPageInner() {
       const payload: BorrowRequest = {
         tokenAddress: CNGN_BASE_ADDRESS,
         amount: borrowAmountUnits,
-        chainId: "0x18", // Test chain for cNGN; adjust for your env
+        chainId: CHAIN_IDS.BASE, // Base mainnet for cNGN
         tenureSeconds,
         collaterals: Array.from(collateralAddresses),
         offramp: false,
