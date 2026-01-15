@@ -956,7 +956,29 @@ function BorrowPageInner() {
     setSuccessOpen(false);
     setIsProcessingBorrow(true);
     setConfirmingOpen(true);
+    setConfirmProgress(0);
 
+    
+    const start = Date.now();
+    const total = 2000; // 2 seconds
+    const progressInterval = window.setInterval(() => {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(100, Math.round((elapsed / total) * 100));
+      setConfirmProgress(progress);
+      
+      if (progress >= 100) {
+        window.clearInterval(progressInterval);
+        setConfirmProgress(100);
+        setTimeout(() => {
+          setConfirmingOpen(false);
+          setIsProcessingBorrow(false);
+          setSuccessOpen(true);
+        }, 300);
+      }
+    }, 50);
+
+    // TEMPORARY: Comment out actual API call for video
+    /*
     try {
       // For new collateral mode, deposit collateral first
       if (!isExistingMode) {
@@ -1064,6 +1086,7 @@ function BorrowPageInner() {
       setIsProcessingBorrow(false);
       setFailedOpen(true);
     }
+    */
   }
 
   async function handleConfirmExistingCngnBorrow() {
