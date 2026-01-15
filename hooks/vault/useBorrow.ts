@@ -49,7 +49,6 @@ export interface BorrowErrorResponse {
 const borrowFn = async (payload: BorrowRequest): Promise<BorrowSuccessResponse> => {
   // Refresh token proactively before onchain operation
   const token = await refreshAccessTokenForOnchain();
-  console.log("[Borrow] Starting onchain transaction with refreshed token");
   
   const res = await postFetch<BorrowSuccessResponse, BorrowRequest>("/lending/borrow", payload);
   return res.data;

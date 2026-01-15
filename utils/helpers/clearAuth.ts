@@ -8,6 +8,6 @@ export const clearAuth = () => {
   // Clear Zustand store
   useAuthStore.getState().clear();
 
-  // Redirect user
-  window.location.href = "/onboarding";
+  // Redirect user to auth page (changed from /onboarding to /auth)
+  window.location.href = "/auth";
 };

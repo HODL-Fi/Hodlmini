@@ -2,10 +2,11 @@ import { useMemo, useEffect } from "react";
 import useGetAccountValue from "@/hooks/vault/useGetAccountValue";
 import { useGetAllChainBalances } from "@/hooks/wallet/useGetTokenWalletBalance";
 import { CHAIN_IDS } from "@/utils/constants/chainIds";
-import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
+import { mapHexChainIdToDextools, makeDextoolsPriceKey, TokenPriceRequest } from "@/utils/prices/dextools";
 import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
 import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
 import { useAccountBalancesStore } from "@/stores/useAccountBalancesStore";
+import { normalizeMantleNativeToken, getPriceLookupInfo } from "@/utils/balances/normalizeMantleToken";
 
 // Exposed shape for top-level balances (wallet strip, etc.)
 export interface GlobalBalances {
@@ -56,20 +57,37 @@ export const useGlobalBalances = () => {
   const { data: balancesByChain } = useGetAllChainBalances(chainList);
 
   const priceTokens = useMemo(() => {
-    if (!balancesByChain) return [];
+    if (!balancesByChain) {
+      return [];
+    }
 
     const seen = new Set<string>();
-    const tokens: { chain: ReturnType<typeof mapHexChainIdToDextools>; address: string }[] = [];
+    const tokens: TokenPriceRequest[] = [];
 
     Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
-      const dextoolsChain = mapHexChainIdToDextools(hexChainId);
-      if (!dextoolsChain) return;
-
       chainBalances.forEach((token) => {
-        let addr = token.contractAddress;
+        // Normalize Mantle native token
+        const normalizedToken = normalizeMantleNativeToken(hexChainId, token);
+        
+        // Check for special price lookup (MNT uses Ethereum chain)
+        const priceLookup = getPriceLookupInfo(hexChainId, token);
+        if (priceLookup) {
+          const key = makeDextoolsPriceKey(priceLookup.chain, priceLookup.address);
+          if (seen.has(key)) {
+            return;
+          }
+          seen.add(key);
+          tokens.push({ chain: priceLookup.chain, address: priceLookup.address });
+          return;
+        }
+
+        const dextoolsChain = mapHexChainIdToDextools(hexChainId);
+        if (!dextoolsChain) return;
+
+        let addr = normalizedToken.contractAddress;
         
         // For ETH (native token with no contract or placeholder address), use WETH address for pricing
-        const isEthNative = token.symbol.toUpperCase() === "ETH" && 
+        const isEthNative = normalizedToken.symbol.toUpperCase() === "ETH" && 
           (!addr || addr === "N/A" || addr === "0x0000000000000000000000000000000000000001");
         
         if (isEthNative) {
@@ -87,14 +105,14 @@ export const useGlobalBalances = () => {
         if (seen.has(key)) return;
         seen.add(key);
 
-        tokens.push({ chain: dextoolsChain, address: addr });
+        tokens.push({ chain: dextoolsChain, address: addr } as TokenPriceRequest);
       });
     });
 
     return tokens;
   }, [balancesByChain]);
 
-  const { data: tokenPrices } = useTokenPrices(priceTokens as any);
+  const { data: tokenPrices } = useTokenPrices(priceTokens);
 
   const walletUsd = useMemo(() => {
     if (!balancesByChain || !tokenPrices) return 0;
@@ -102,15 +120,29 @@ export const useGlobalBalances = () => {
     let total = 0;
 
     Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
-      const dextoolsChain = mapHexChainIdToDextools(hexChainId);
-      if (!dextoolsChain) return;
-
       chainBalances.forEach((token) => {
         const amount = Number(token.balance) || 0;
-        let priceAddress = token.contractAddress;
+        
+        // Normalize Mantle native token
+        const normalizedToken = normalizeMantleNativeToken(hexChainId, token);
+        
+        // Check for special price lookup (MNT uses Ethereum chain)
+        const priceLookup = getPriceLookupInfo(hexChainId, token);
+        if (priceLookup) {
+          const key = makeDextoolsPriceKey(priceLookup.chain, priceLookup.address);
+          const p = (tokenPrices as any)[key];
+          const price = p?.price ?? 0;
+          total += amount * price;
+          return;
+        }
+
+        const dextoolsChain = mapHexChainIdToDextools(hexChainId);
+        if (!dextoolsChain) return;
+
+        let priceAddress = normalizedToken.contractAddress;
         
         // Use WETH address for ETH tokens (native token has no contract or placeholder address)
-        const isEthNative = token.symbol.toUpperCase() === "ETH" && 
+        const isEthNative = normalizedToken.symbol.toUpperCase() === "ETH" && 
           (!priceAddress || priceAddress === "N/A" || priceAddress === "0x0000000000000000000000000000000000000001");
         
         if (isEthNative) {

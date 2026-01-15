@@ -35,7 +35,6 @@ export interface withdrawColError {
 const withdrawCollateralFn = async (payload: withdrawColRequest): Promise<withdrawColResponse> => {
   // Refresh token proactively before onchain operation
   const token = await refreshAccessTokenForOnchain();
-  console.log("[Withdraw Collateral] Starting onchain transaction with refreshed token");
   
   const res = await postFetch<withdrawColResponse, withdrawColRequest>("/lending/withdraw-collateral", payload);
   return res.data;  // backend wraps response under `data`

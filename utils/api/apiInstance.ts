@@ -33,8 +33,7 @@ axiosInstance.interceptors.request.use(
         // Log token usage for onchain operations
         const isOnchainOperation = config.url?.includes('/lending/') || config.url?.includes('/users/send');
         if (isOnchainOperation) {
-          console.log(`[API Request] Using access token for onchain operation: ${config.method?.toUpperCase()} ${config.url}`);
-          console.log(`[API Request] Token (first 20 chars): ${token.substring(0, 20)}...`);
+          // Using access token for onchain operation
         }
       }
     }
@@ -52,6 +51,21 @@ axiosInstance.interceptors.response.use(
 
     // Only handle 401 responses
     if (error.response?.status === 401) {
+      const errorMessage = error.response?.data?.message || "";
+      const errorError = error.response?.data?.error || "";
+      
+      // Check for specific "Invalid or expired token" error message
+      const isInvalidTokenError = 
+        errorMessage === "Invalid or expired token" || 
+        errorError === "Unauthorized";
+      
+      // If this is the specific invalid token error, immediately logout
+      if (isInvalidTokenError) {
+        clearAuth();
+        window.location.href = "/auth";
+        return Promise.reject(error);
+      }
+
       const refreshToken = localStorage.getItem("refreshToken");
       const accessToken = localStorage.getItem("accessToken");
 
@@ -67,7 +81,7 @@ axiosInstance.interceptors.response.use(
       // If no refresh token → logout & redirect
       if (!refreshToken) {
         clearAuth();
-        window.location.href = "/onboarding";
+        window.location.href = "/auth";
         return Promise.reject(error);
       }
 
@@ -85,7 +99,7 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         // ❌ Refresh failed → force logout
         clearAuth();
-        window.location.href = "/onboarding";
+        window.location.href = "/auth";
         return Promise.reject(refreshError);
       }
     }

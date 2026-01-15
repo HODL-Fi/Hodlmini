@@ -35,7 +35,6 @@ const depositCollateralFn = async (
 ): Promise<DepositColResponse> => {
   // Refresh token proactively before onchain operation
   const token = await refreshAccessTokenForOnchain();
-  console.log("[Deposit Collateral] Starting onchain transaction with refreshed token");
   
   const res = await postFetch<DepositColResponse, DepositColRequest>(
     "/lending/deposit-collateral",

@@ -14,7 +14,9 @@ export const useTokenPrices = (tokens: TokenPriceRequest[]) => {
 
   return useQuery<Record<string, TokenPriceResult>, Error>({
     queryKey: ["tokenPrices", tokensKey],
-    queryFn: () => fetchTokenPrices(tokens),
+    queryFn: () => {
+      return fetchTokenPrices(tokens);
+    },
     enabled: tokens.length > 0,
     // Data freshness: from 120 sec - cache for 120s
     staleTime: 120_000,

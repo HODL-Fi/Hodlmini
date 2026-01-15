@@ -95,6 +95,10 @@ export default function SwapPage() {
   const getAssetIcon = React.useCallback(
     (symbol: string, apiLogo: string | null | undefined): string => {
       const lower = symbol.toLowerCase();
+      // Special case: MNT should use chain logo, not asset logo
+      if (lower === "mnt") {
+        return "/chains/mantle.svg";
+      }
       if (LOCAL_ICONS.includes(lower)) {
         return `/assets/${lower}.svg`;
       }

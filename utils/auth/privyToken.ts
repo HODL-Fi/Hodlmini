@@ -61,8 +61,7 @@ export async function refreshAccessTokenForOnchain(): Promise<string | null> {
   const token = await getPrivyAccessToken();
   
   if (token) {
-    console.log("[Onchain Token Refresh] New access token obtained:", token.substring(0, 20) + "...");
-    console.log("[Onchain Token Refresh] Full token:", token);
+    // New access token obtained for onchain operation
   } else {
     console.warn("[Onchain Token Refresh] No access token available for onchain operation");
   }

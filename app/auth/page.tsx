@@ -213,13 +213,12 @@ function AuthPageInner() {
             {/* <GoogleLogin
   onSuccess={(credentialResponse) => {
     const idToken = credentialResponse; // ← THIS IS THE GOOGLE ID TOKEN
-    console.log("ID TOKEN:", idToken);
 
     // send to backend / Web3auth / whatever
     // handleGoogleLogin(idToken);
   }}
   onError={() => {
-    console.log("Login Failed");
+    // Login Failed
   }}
               
 /> */}

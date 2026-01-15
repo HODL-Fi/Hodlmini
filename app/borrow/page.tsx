@@ -22,6 +22,7 @@ import useGetAccountValue from "@/hooks/vault/useGetAccountValue";
 import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
 import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
 import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
+import { normalizeMantleNativeToken, getPriceLookupInfo } from "@/utils/balances/normalizeMantleToken";
 import { CHAIN_IDS } from "@/utils/constants/chainIds";
 import { CNGN_BASE_ADDRESS, CNGN_DECIMALS } from "@/utils/constants/cngn";
 import { useNgnConversion } from "@/hooks/useNgnConversion";
@@ -46,18 +47,6 @@ function BorrowPageInner() {
   React.useEffect(() => setMounted(true), []);
   const modeParam = searchParams?.get("mode") ?? undefined; // existing | new
   const isExistingMode = modeParam === "existing";
-  const assets = React.useMemo(() => ([
-    // Static metadata only; all financial values come from live data elsewhere.
-    // MVP: Only cNGN for borrowing
-    // { symbol: "ETH",  name: "Ethereum",      icon: "/assets/eth.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    // { symbol: "WETH", name: "Wrapped ETH",   icon: "/assets/weth.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    // { symbol: "DAI",  name: "DAI",           icon: "/assets/dai.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    { symbol: "cNGN", name: "compliant NGN", icon: "/assets/cngn.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    // { symbol: "WKC",  name: "Wikicat",       icon: "/assets/wkc.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    // { symbol: "USDT", name: "Tether",        icon: "/assets/usdt.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    // { symbol: "USDC", name: "USD Coin",      icon: "/assets/usdc.svg", priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-    // { symbol: "BNB",  name: "BNB",           icon: "/assets/bnb.svg",  priceUsd: 0, balance: 0, collateralFactor: 0, liquidationThreshold: 0 },
-  ]), []);
   const fiats = React.useMemo(() => ([
     // MVP: Only NGN and cNGN for borrowing
     { code: "NGN",  name: "Nigerian Naira",            icon: "/fiat/ngn.svg" },
@@ -67,9 +56,7 @@ function BorrowPageInner() {
     { code: "cNGN", name: "compliant NGN (on-chain)",  icon: "/assets/cngn.svg" },
   ]), []);
 
-  const [collateralLines, setCollateralLines] = React.useState<{ symbol: string; amount: string }[]>([
-    { symbol: assets[0].symbol, amount: "" },
-  ]);
+  const [collateralLines, setCollateralLines] = React.useState<{ symbol: string; amount: string }[]>([]);
   const [selectedFiat, setSelectedFiat] = React.useState(fiats[0]);
   const [fiatReceive, setFiatReceive] = React.useState("");
   const [assetModalOpen, setAssetModalOpen] = React.useState(false);
@@ -184,14 +171,27 @@ function BorrowPageInner() {
     const tokens: { chain: ReturnType<typeof mapHexChainIdToDextools>; address: string }[] = [];
 
     Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
-      const dextoolsChain = mapHexChainIdToDextools(hexChainId);
-      if (!dextoolsChain) return;
-
       chainBalances.forEach((token) => {
-        let addr = token.contractAddress;
+        // Normalize Mantle native token
+        const normalizedToken = normalizeMantleNativeToken(hexChainId, token);
+        
+        // Check for special price lookup (MNT uses Ethereum chain)
+        const priceLookup = getPriceLookupInfo(hexChainId, token);
+        if (priceLookup) {
+          const key = makeDextoolsPriceKey(priceLookup.chain, priceLookup.address);
+          if (seen.has(key)) return;
+          seen.add(key);
+          tokens.push({ chain: priceLookup.chain, address: priceLookup.address });
+          return;
+        }
+
+        const dextoolsChain = mapHexChainIdToDextools(hexChainId);
+        if (!dextoolsChain) return;
+
+        let addr = normalizedToken.contractAddress;
 
         const isEthNative =
-          token.symbol.toUpperCase() === "ETH" &&
+          normalizedToken.symbol.toUpperCase() === "ETH" &&
           (!addr ||
             addr === "N/A" ||
             addr === "0x0000000000000000000000000000000000000001");
@@ -241,12 +241,26 @@ function BorrowPageInner() {
     const map = new Map<string, number>();
     if (!collateralPosition.data) return map;
 
-    Object.values(collateralPosition.data).forEach((list) => {
+    Object.entries(collateralPosition.data).forEach(([chainId, list]) => {
       (list || []).forEach((asset: CollateralPosition) => {
         const cfNum = Number(asset.cf) || 0;
         if (cfNum <= 0) return;
-        const sym = asset.symbol?.toUpperCase();
+        let sym = asset.symbol?.toUpperCase();
         if (!sym) return;
+        
+        // Normalize Mantle native token: if backend returns ETH for Mantle chain with placeholder address, use MNT
+        const addr = String(asset.address || "").toLowerCase();
+        const chainIdStr = String(chainId).toLowerCase();
+        // Check if this is Mantle chain (0x1388 hex or 5000 decimal)
+        const isMantleChain = chainIdStr === "0x1388" || chainIdStr === "5000" || 
+                             chainIdStr === CHAIN_IDS.MANTLE.toLowerCase();
+        // Check if this is the native token placeholder address
+        const isPlaceholderAddress = addr === "0x0000000000000000000000000000000000000001" || 
+                                    addr === "1";
+        if (isMantleChain && isPlaceholderAddress && sym === "ETH") {
+          sym = "MNT";
+        }
+        
         const cfFraction = cfNum / 10_000; // bps -> fraction
         const prev = map.get(sym);
         // Keep the highest CF we see for this symbol across chains
@@ -264,7 +278,7 @@ function BorrowPageInner() {
     if (!collateralPosition.data) return [] as { symbol: string; amount: number }[];
 
     const bySymbol = new Map<string, number>();
-    Object.values(collateralPosition.data).forEach((list) => {
+    Object.entries(collateralPosition.data).forEach(([chainId, list]) => {
       (list || []).forEach((asset: CollateralPosition) => {
         const raw = Number(asset.amount);
         const decimals = getTokenDecimals((asset as any).decimals, asset.symbol, String(asset.address || ""));
@@ -272,8 +286,20 @@ function BorrowPageInner() {
         const denom = 10 ** decimals;
         const amt = raw / denom;
         if (amt <= 0) return;
-        const sym = asset.symbol?.toUpperCase();
+        let sym = asset.symbol?.toUpperCase();
         if (!sym) return;
+        
+        // Normalize Mantle native token: if backend returns ETH for Mantle chain with placeholder address, use MNT
+        const chainIdStr = String(chainId).toLowerCase();
+        const isMantleChain = chainIdStr === "0x1388" || chainIdStr === "5000" || 
+                             chainIdStr === CHAIN_IDS.MANTLE.toLowerCase();
+        const addr = String(asset.address || "").toLowerCase();
+        const isPlaceholderAddress = addr === "0x0000000000000000000000000000000000000001" || 
+                                    addr === "1";
+        if (isMantleChain && isPlaceholderAddress && sym === "ETH") {
+          sym = "MNT";
+        }
+        
         const prev = bySymbol.get(sym) ?? 0;
         bySymbol.set(sym, prev + amt);
       });
@@ -306,19 +332,23 @@ function BorrowPageInner() {
     const set = new Set<string>();
     if (!balancesByChain) return set;
 
-    Object.entries(balancesByChain).forEach(([_, chainBalances]) => {
+    Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
       chainBalances.forEach((token) => {
         const amount = Number(token.balance) || 0;
         if (amount <= 0) return;
 
-        let whitelistAddress = (token.contractAddress || "").toLowerCase();
-        const isEthNativeForWhitelist =
-          token.symbol.toUpperCase() === "ETH" &&
+        // Normalize Mantle native token
+        const normalizedToken = normalizeMantleNativeToken(hexChainId, token);
+
+        let whitelistAddress = (normalizedToken.contractAddress || "").toLowerCase();
+        const symbolUpper = normalizedToken.symbol.toUpperCase();
+        const isNativeTokenForWhitelist =
+          (symbolUpper === "ETH" || symbolUpper === "MNT") &&
           (!whitelistAddress ||
             whitelistAddress === "n/a" ||
             whitelistAddress === "0x0000000000000000000000000000000000000001");
-        if (isEthNativeForWhitelist) {
-          // Backend uses this sentinel address for native ETH collateral
+        if (isNativeTokenForWhitelist) {
+          // Backend uses this sentinel address for native tokens (ETH, MNT, etc.) as collateral
           whitelistAddress = "0x0000000000000000000000000000000000000001";
         }
 
@@ -329,12 +359,87 @@ function BorrowPageInner() {
           return;
         }
 
-        set.add(token.symbol.toUpperCase());
+        set.add(normalizedToken.symbol.toUpperCase());
       });
     });
 
     return set;
   }, [balancesByChain, collateralWhitelist]);
+
+  // Build assets dynamically from available collateral tokens in wallet
+  const assets = React.useMemo(() => {
+    const assetMap = new Map<string, { symbol: string; name: string; icon: string; priceUsd: number; balance: number; collateralFactor: number; liquidationThreshold: number }>();
+    
+    // Add static assets first (for known tokens with local icons)
+    const staticAssets: Array<{ symbol: string; name: string; icon: string }> = [
+      { symbol: "cNGN", name: "compliant NGN", icon: "/assets/cngn.svg" },
+      { symbol: "ETH", name: "Ethereum", icon: "/assets/eth.svg" },
+      { symbol: "MNT", name: "Mantle", icon: "/chains/mantle.svg" },
+      { symbol: "WETH", name: "Wrapped ETH", icon: "/assets/weth.svg" },
+      { symbol: "USDT", name: "Tether", icon: "/assets/usdt.svg" },
+      { symbol: "USDC", name: "USD Coin", icon: "/assets/usdc.svg" },
+      { symbol: "DAI", name: "DAI", icon: "/assets/dai.svg" },
+      { symbol: "BNB", name: "BNB", icon: "/assets/bnb.svg" },
+      { symbol: "LINK", name: "ChainLink Token", icon: "/assets/link.svg" },
+    ];
+    
+    staticAssets.forEach(a => {
+      assetMap.set(a.symbol.toUpperCase(), {
+        ...a,
+        priceUsd: 0,
+        balance: 0,
+        collateralFactor: 0,
+        liquidationThreshold: 0,
+      });
+    });
+    
+    // Add dynamic assets from wallet balances that are available as collateral
+    if (balancesByChain && availableCollateralSymbols.size > 0) {
+      Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
+        chainBalances.forEach((token) => {
+          const normalizedToken = normalizeMantleNativeToken(hexChainId, token);
+          const symbolUpper = normalizedToken.symbol.toUpperCase();
+          
+          if (availableCollateralSymbols.has(symbolUpper) && !assetMap.has(symbolUpper)) {
+            // Determine icon path
+            const symbolLower = normalizedToken.symbol.toLowerCase();
+            let icon = "/assets/eth.svg"; // default fallback
+            
+            // Check for local icons first
+            if (symbolLower === "mnt") {
+              icon = "/chains/mantle.svg";
+            } else if (["eth", "usdt", "usdc", "dai", "weth", "bnb", "cngn", "link"].includes(symbolLower)) {
+              icon = `/assets/${symbolLower}.svg`;
+            } else if (normalizedToken.logo) {
+              icon = normalizedToken.logo;
+            }
+            
+            assetMap.set(symbolUpper, {
+              symbol: normalizedToken.symbol,
+              name: normalizedToken.name,
+              icon,
+              priceUsd: 0,
+              balance: 0,
+              collateralFactor: 0,
+              liquidationThreshold: 0,
+            });
+          }
+        });
+      });
+    }
+    
+    // Return only assets that are in availableCollateralSymbols
+    return Array.from(assetMap.values()).filter(a => 
+      availableCollateralSymbols.has(a.symbol.toUpperCase())
+    );
+  }, [balancesByChain, availableCollateralSymbols]);
+
+  // Initialize collateralLines when assets become available
+  React.useEffect(() => {
+    if (assets.length > 0 && collateralLines.length === 0) {
+      setCollateralLines([{ symbol: assets[0].symbol, amount: "" }]);
+    }
+  }, [assets, collateralLines.length]);
 
   // Parse usdValue from API (handles scientific notation like "9.9979195e+26")
   const parseUsdValue = (usdValue: string | number | undefined): number => {
@@ -408,7 +513,9 @@ function BorrowPageInner() {
         const amount = Number(token.balance) || 0;
         if (!amount || amount <= 0) return;
 
-        const sym = token.symbol.toUpperCase();
+        // Normalize Mantle native token
+        const normalizedToken = normalizeMantleNativeToken(hexChainId, token);
+        const sym = normalizedToken.symbol.toUpperCase();
         const prevBal = balances.get(sym) ?? 0;
         balances.set(sym, prevBal + amount);
         
@@ -418,13 +525,26 @@ function BorrowPageInner() {
           const prevUsd = usdSums.get(sym) ?? 0;
           usdSums.set(sym, prevUsd + amount * apiPrice);
         } else if (tokenPrices) {
+          // Check for special price lookup (MNT uses Ethereum chain)
+          const priceLookup = getPriceLookupInfo(hexChainId, token);
+          if (priceLookup) {
+            const priceKey = makeDextoolsPriceKey(priceLookup.chain, priceLookup.address);
+            const p = (tokenPrices as any)[priceKey];
+            const price = p?.price ?? 0;
+            if (price > 0) {
+              const prevUsd = usdSums.get(sym) ?? 0;
+              usdSums.set(sym, prevUsd + amount * price);
+            }
+            return;
+          }
+
           const dextoolsChain = mapHexChainIdToDextools(hexChainId);
           if (!dextoolsChain) return;
 
-          let priceAddress = token.contractAddress;
+          let priceAddress = normalizedToken.contractAddress;
 
           const isEthNative =
-            token.symbol.toUpperCase() === "ETH" &&
+            normalizedToken.symbol.toUpperCase() === "ETH" &&
             (!priceAddress ||
               priceAddress === "N/A" ||
               priceAddress === "0x0000000000000000000000000000000000000001");
@@ -571,6 +691,16 @@ function BorrowPageInner() {
     return capacity;
   }, [collateralLines, isExistingMode, existingPositions, priceBySymbol, cfBySymbol]);
 
+  // Get available to borrow from backend (for existing mode)
+  const availableToBorrowFromBackend = React.useMemo(() => {
+    if (!accountValue.data) return 0;
+    let total = 0;
+    Object.values(accountValue.data).forEach((value) => {
+      total += normalizeAccountMetric(value.availableToBorrow);
+    });
+    return total;
+  }, [accountValue.data]);
+
   // Convert existing debt to selected fiat currency
   const existingDebtInFiat = React.useMemo(() => {
     if (existingDebtUsd <= 0) return 0;
@@ -595,27 +725,35 @@ function BorrowPageInner() {
 
   // Max lending amount = total capacity - existing debt
   const maxLendForCollateral = React.useMemo(() => {
-    if (!isFinite(totalCollateralCapacityUsd) || totalCollateralCapacityUsd <= 0) {
-      return 0;
+    let availableUsd = 0;
+
+    if (isExistingMode) {
+      // For existing mode: use backend value
+      availableUsd = availableToBorrowFromBackend;
+    } else {
+      // For first-time borrow (new mode): calculate from selected collateral tokens
+      if (!isFinite(totalCollateralCapacityUsd) || totalCollateralCapacityUsd <= 0) {
+        return 0;
+      }
+      // Use the calculated capacity from selected collateral (no debt subtraction needed for first-time)
+      availableUsd = totalCollateralCapacityUsd;
     }
 
-    // Convert total capacity to selected fiat
-    let maxCapacityInFiat = totalCollateralCapacityUsd;
+    // Convert to selected fiat
+    let availableInFiat = availableUsd;
 
     if (selectedFiat.code === "cNGN") {
       if (cngnPrice > 0) {
-        maxCapacityInFiat = totalCollateralCapacityUsd / cngnPrice;
+        availableInFiat = availableUsd / cngnPrice;
       }
     } else if (selectedFiat.code === "NGN") {
       if (usdToNgnRate > 0) {
-        maxCapacityInFiat = totalCollateralCapacityUsd * usdToNgnRate;
+        availableInFiat = availableUsd * usdToNgnRate;
       }
     }
 
-    // Subtract existing debt
-    const available = maxCapacityInFiat - existingDebtInFiat;
-    return Math.max(0, available);
-  }, [totalCollateralCapacityUsd, existingDebtInFiat, selectedFiat.code, cngnPrice, usdToNgnRate]);
+    return Math.max(0, availableInFiat);
+  }, [isExistingMode, totalCollateralCapacityUsd, availableToBorrowFromBackend, selectedFiat.code, cngnPrice, usdToNgnRate]);
 
   // Max capacity in selected fiat (before subtracting debt) - for display
   const maxCapacityInFiat = React.useMemo(() => {
@@ -1079,7 +1217,8 @@ function BorrowPageInner() {
             {!isExistingMode && !collateralExpanded && (
               <div className="mt-2 flex items-center gap-2 overflow-x-auto">
                 {collateralLines.map((line, idx) => {
-                  const asset = assets.find((a) => a.symbol === line.symbol)!;
+                  const asset = assets.find((a) => a.symbol === line.symbol);
+                  if (!asset) return null; // Skip if asset not found
                   const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
                   return (
                     <div key={`${line.symbol}-${idx}`} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2 py-1 text-[12px] text-gray-800">
@@ -1104,7 +1243,8 @@ function BorrowPageInner() {
               <div className="relative">
                 <div ref={listRef} className="mt-2 space-y-4 max-h-[160px] overflow-y-auto pr-1 u-shadow-inner scrollbar-fancy">
                 {collateralLines.map((line, idx) => {
-                  const asset = assets.find((a) => a.symbol === line.symbol)!;
+                  const asset = assets.find((a) => a.symbol === line.symbol);
+                  if (!asset) return null; // Skip if asset not found
                   const sym = asset.symbol.toUpperCase();
                   const walletBal = balanceBySymbol.get(sym) ?? 0;
                   const price = priceBySymbol.get(sym) ?? 0;
@@ -1298,43 +1438,47 @@ function BorrowPageInner() {
           <div className="space-y-3">
             <div className="text-[18px] font-semibold">Select token</div>
             <div className="divide-y divide-gray-100 rounded-2xl overflow-hidden">
-              {assets
-                .filter((a) => availableCollateralSymbols.has(a.symbol.toUpperCase()))
-                .map((a) => {
-                const active = assetRowIndex !== null && collateralLines[assetRowIndex]?.symbol === a.symbol;
-                const usedElsewhere = collateralLines.some((l, i) => i !== assetRowIndex && l.symbol === a.symbol);
-                const disabled = usedElsewhere || active; // already selected elsewhere or same as current
-                return (
-                  <button
-                    key={a.symbol}
-                    type="button"
-                    onClick={() => {
-                      if (disabled) return;
-                      if (assetRowIndex !== null) {
-                        setCollateralLines((prev) => {
-                          const next = [...prev];
-                          next[assetRowIndex] = { ...next[assetRowIndex], symbol: a.symbol };
-                          return next;
-                        });
-                        setAssetRowIndex(null);
-                      }
-                      setAssetModalOpen(false);
-                    }}
-                    aria-disabled={disabled}
-                    className={`flex w-full items-center gap-3 px-3 py-3 text-left ${disabled ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "bg-white hover:bg-gray-50 cursor-pointer"} ${active ? "bg-gray-50" : ""}`}
-                  >
-                    <Image src={a.icon} alt={a.symbol} width={28} height={28} />
-                    <div className="flex-1">
-                      <div className="text-[14px] font-medium">{a.name} ({a.symbol})</div>
-                    </div>
-                    {active && (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
+              {assets.length === 0 ? (
+                <div className="px-3 py-6 text-center text-[14px] text-gray-500">
+                  No collateral assets available. Make sure you have tokens in your wallet that are whitelisted as collateral.
+                </div>
+              ) : (
+                assets.map((a) => {
+                  const active = assetRowIndex !== null && collateralLines[assetRowIndex]?.symbol === a.symbol;
+                  const usedElsewhere = collateralLines.some((l, i) => i !== assetRowIndex && l.symbol === a.symbol);
+                  const disabled = usedElsewhere || active; // already selected elsewhere or same as current
+                  return (
+                    <button
+                      key={a.symbol}
+                      type="button"
+                      onClick={() => {
+                        if (disabled) return;
+                        if (assetRowIndex !== null) {
+                          setCollateralLines((prev) => {
+                            const next = [...prev];
+                            next[assetRowIndex] = { ...next[assetRowIndex], symbol: a.symbol };
+                            return next;
+                          });
+                          setAssetRowIndex(null);
+                        }
+                        setAssetModalOpen(false);
+                      }}
+                      aria-disabled={disabled}
+                      className={`flex w-full items-center gap-3 px-3 py-3 text-left ${disabled ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "bg-white hover:bg-gray-50 cursor-pointer"} ${active ? "bg-gray-50" : ""}`}
+                    >
+                      <Image src={a.icon} alt={a.symbol} width={28} height={28} />
+                      <div className="flex-1">
+                        <div className="text-[14px] font-medium">{a.name} ({a.symbol})</div>
+                      </div>
+                      {active && (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         </Modal>
@@ -1427,7 +1571,7 @@ function BorrowPageInner() {
             setBankOpen(true);
           }}
           collaterals={
-            isExistingMode
+            (isExistingMode
               ? existingPositions
                   .map((pos): { symbol: string; amount: number; icon?: string } | null => {
                   const asset = assets.find((a) => a.symbol === pos.symbol);
@@ -1436,11 +1580,15 @@ function BorrowPageInner() {
                   return { symbol: asset.symbol, amount: isFinite(amt) ? amt : 0, icon: asset.icon };
                   })
                   .filter((c): c is { symbol: string; amount: number; icon?: string } => c !== null)
-              : collateralLines.map((line) => {
-                  const asset = assets.find((a) => a.symbol === line.symbol)!;
-                  const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
-                  return { symbol: asset.symbol, amount: isFinite(amt) ? amt : 0, icon: asset.icon };
-                })
+              : collateralLines
+                  .map((line): { symbol: string; amount: number; icon?: string } | null => {
+                    const asset = assets.find((a) => a.symbol === line.symbol);
+                    if (!asset) return null; // Skip if asset not found
+                    const amt = parseFloat((line.amount || "0").replace(/,/g, ""));
+                    return { symbol: asset.symbol, amount: isFinite(amt) ? amt : 0, icon: asset.icon };
+                  })
+                  .filter((c): c is { symbol: string; amount: number; icon?: string } => c !== null)
+            ) as Array<{ symbol: string; amount: number; icon?: string }>
           }
           receiveAmount={Number.isFinite(receiveNumeric) ? receiveNumeric : 0}
           fiatCode={selectedFiat.code}

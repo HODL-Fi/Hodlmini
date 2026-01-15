@@ -1,0 +1,49 @@
+{
+    "0x1388": [
+        {
+            "name": "USD Coin",
+            "symbol": "USDC",
+            "decimals": 6,
+            "usdValue": "999708830000000000",
+            "contractAddress": "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9",
+            "logo": null,
+            "balance": "0.0000"
+        },
+        {
+            "name": "Ether",
+            "symbol": "WETH",
+            "decimals": 18,
+            "usdValue": "0",
+            "contractAddress": "0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111",
+            "logo": null,
+            "balance": "0.0000"
+        },
+        {
+            "name": "Tether USD",
+            "symbol": "USDT",
+            "decimals": 6,
+            "usdValue": "999990000000000000",
+            "contractAddress": "0x201EBa5CC46D216Ce6DC03F6a759e8E766e956aE",
+            "logo": null,
+            "balance": "0.0000"
+        },
+        {
+            "name": "ChainLink Token",
+            "symbol": "LINK",
+            "decimals": 18,
+            "usdValue": "0",
+            "contractAddress": "0xfe36cF0B43aAe49fBc5cFC5c0AF22a623114E043",
+            "logo": null,
+            "balance": "0.0000"
+        },
+        {
+            "name": "Mantle",
+            "symbol": "MNT",
+            "decimals": 18,
+            "usdValue": "0",
+            "contractAddress": "0x0000000000000000000000000000000000000001",
+            "logo": null,
+            "balance": "10.0799"
+        }
+    ]
+}

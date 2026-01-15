@@ -20,6 +20,7 @@ import { useTokenMetadataBatch } from "@/hooks/prices/useTokenMetadata";
 import { useTokenPrices } from "@/hooks/prices/useTokenPrices";
 import { mapHexChainIdToDextools, makeDextoolsPriceKey } from "@/utils/prices/dextools";
 import { getWethAddressForChain } from "@/utils/constants/wethAddresses";
+import { normalizeMantleNativeToken, getPriceLookupInfo } from "@/utils/balances/normalizeMantleToken";
 
 export default function WalletPage() {
   // Supported chains - only include chains that exist in CHAIN_IDS
@@ -63,6 +64,10 @@ export default function WalletPage() {
     dextoolsLogo: string | null
   ): string => {
     const symbolLower = symbol.toLowerCase();
+    // Special case: MNT should use chain logo, not asset logo
+    if (symbolLower === "mnt") {
+      return "/chains/mantle.svg";
+    }
     if (LOCAL_ICONS.includes(symbolLower)) {
       return `/assets/${symbolLower}.svg`;
     }
@@ -108,14 +113,27 @@ export default function WalletPage() {
     const tokens: { chain: ReturnType<typeof mapHexChainIdToDextools>; address: string }[] = [];
 
     Object.entries(balancesByChain).forEach(([hexChainId, chainBalances]) => {
-      const dextoolsChain = mapHexChainIdToDextools(hexChainId);
-      if (!dextoolsChain) return;
-
       chainBalances.forEach((token) => {
-        let addr = token.contractAddress;
+        // Normalize Mantle native token
+        const normalizedToken = normalizeMantleNativeToken(hexChainId, token);
+        
+        // Check for special price lookup (MNT uses Ethereum chain)
+        const priceLookup = getPriceLookupInfo(hexChainId, token);
+        if (priceLookup) {
+          const key = makeDextoolsPriceKey(priceLookup.chain, priceLookup.address);
+          if (seen.has(key)) return;
+          seen.add(key);
+          tokens.push({ chain: priceLookup.chain, address: priceLookup.address });
+          return;
+        }
+
+        const dextoolsChain = mapHexChainIdToDextools(hexChainId);
+        if (!dextoolsChain) return;
+
+        let addr = normalizedToken.contractAddress;
         
         // For ETH (native token with no contract or placeholder address), use WETH address for pricing
-        const isEthNative = token.symbol.toUpperCase() === "ETH" && 
+        const isEthNative = normalizedToken.symbol.toUpperCase() === "ETH" && 
           (!addr || addr === "N/A" || addr === "0x0000000000000000000000000000000000000001");
         
         if (isEthNative) {
@@ -154,14 +172,18 @@ export default function WalletPage() {
       if (!dextoolsChain) return;
 
       chainBalances.forEach((token) => {
-        const symbolLower = token.symbol.toLowerCase();
+        // Normalize Mantle native token
+        const normalizedToken = normalizeMantleNativeToken(hexChainId, token);
+        
+        const symbolLower = normalizedToken.symbol.toLowerCase();
         // Skip if we have a local icon
         if (LOCAL_ICONS.includes(symbolLower)) return;
         
-        const addr = token.contractAddress;
+        // Skip if API already provided a logo (or if normalized token has logo)
+        if (normalizedToken.logo) return;
+        
+        const addr = normalizedToken.contractAddress;
         if (!addr || addr === "N/A") return; // skip native / non-contract tokens
-        // Skip if API already provided a logo
-        if (token.logo) return;
 
         const key = makeDextoolsPriceKey(dextoolsChain, addr);
         if (seen.has(key)) return;
@@ -203,39 +225,55 @@ export default function WalletPage() {
       chainBalances.forEach((token) => {
         const amount = Number(token.balance);
 
+        // Normalize Mantle native token
+        const normalizedToken = normalizeMantleNativeToken(chainId, token);
+
         // Look up price from DEXTools if we have a contract address + mapping
         // For ETH (native token), use WETH address for pricing
         let price = 0;
         let changePct = 0;
-        const dextoolsChain = mapHexChainIdToDextools(chainId);
-        if (dextoolsChain && tokenPrices) {
-          let priceAddress = token.contractAddress;
-          
-          // Use WETH address for ETH tokens (native token has no contract or placeholder address)
-          const isEthNative = token.symbol.toUpperCase() === "ETH" && 
-            (!priceAddress || priceAddress === "N/A" || priceAddress === "0x0000000000000000000000000000000000000001");
-          
-          if (isEthNative) {
-            const wethAddr = getWethAddressForChain(chainId);
-            if (wethAddr) {
-              priceAddress = wethAddr;
-            }
+        
+        // Check for special price lookup (MNT uses Ethereum chain)
+        const priceLookup = getPriceLookupInfo(chainId, token);
+        if (priceLookup && tokenPrices) {
+          const priceKey = makeDextoolsPriceKey(priceLookup.chain, priceLookup.address);
+          const p = (tokenPrices as any)[priceKey];
+          if (p) {
+            price = p.price ?? 0;
+            changePct = p.variation24h ?? 0;
           }
-          
-          if (priceAddress && priceAddress !== "N/A" && priceAddress !== "0x0000000000000000000000000000000000000001") {
-            const priceKey = makeDextoolsPriceKey(dextoolsChain, priceAddress);
-            const p = (tokenPrices as any)[priceKey];
-            if (p) {
-              price = p.price ?? 0;
-              changePct = p.variation24h ?? 0;
+        } else {
+          const dextoolsChain = mapHexChainIdToDextools(chainId);
+          if (dextoolsChain && tokenPrices) {
+            let priceAddress = normalizedToken.contractAddress;
+            
+            // Use WETH address for ETH tokens (native token has no contract or placeholder address)
+            const isEthNative = normalizedToken.symbol.toUpperCase() === "ETH" && 
+              (!priceAddress || priceAddress === "N/A" || priceAddress === "0x0000000000000000000000000000000000000001");
+            
+            if (isEthNative) {
+              const wethAddr = getWethAddressForChain(chainId);
+              if (wethAddr) {
+                priceAddress = wethAddr;
+              }
+            }
+            
+            if (priceAddress && priceAddress !== "N/A" && priceAddress !== "0x0000000000000000000000000000000000000001") {
+              const priceKey = makeDextoolsPriceKey(dextoolsChain, priceAddress);
+              const p = (tokenPrices as any)[priceKey];
+              if (p) {
+                price = p.price ?? 0;
+                changePct = p.variation24h ?? 0;
+              }
             }
           }
         }
 
         // Look up logo from DEXTools metadata if needed
         let dextoolsLogo: string | null = null;
-        if (dextoolsChain && token.contractAddress && token.contractAddress !== "N/A" && tokenMetadata) {
-          const metadataKey = makeDextoolsPriceKey(dextoolsChain, token.contractAddress);
+        const dextoolsChain = mapHexChainIdToDextools(chainId);
+        if (dextoolsChain && normalizedToken.contractAddress && normalizedToken.contractAddress !== "N/A" && tokenMetadata) {
+          const metadataKey = makeDextoolsPriceKey(dextoolsChain, normalizedToken.contractAddress);
           const metadata = (tokenMetadata as any)[metadataKey];
           if (metadata?.logo) {
             dextoolsLogo = metadata.logo;
@@ -244,9 +282,9 @@ export default function WalletPage() {
 
         // Create a separate asset entry for each token on each chain
         assets.push({
-          symbol: token.symbol,
-          name: token.name,
-          icon: getAssetIcon(token.symbol, token.logo, token.contractAddress, dextoolsLogo),
+          symbol: normalizedToken.symbol,
+          name: normalizedToken.name,
+          icon: getAssetIcon(normalizedToken.symbol, normalizedToken.logo, normalizedToken.contractAddress, dextoolsLogo),
           supported: [chainKey],
           balances: { [chainKey]: amount },
           price,

@@ -42,6 +42,10 @@ export default function SendPage() {
   const getAssetIcon = React.useCallback(
     (symbol: string, apiLogo: string | null | undefined): string => {
       const symbolLower = symbol.toLowerCase();
+      // Special case: MNT should use chain logo, not asset logo
+      if (symbolLower === "mnt") {
+        return "/chains/mantle.svg";
+      }
       if (LOCAL_ICONS.includes(symbolLower)) {
         return `/assets/${symbolLower}.svg`;
       }

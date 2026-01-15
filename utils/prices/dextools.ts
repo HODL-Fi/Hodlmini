@@ -1,5 +1,11 @@
 import { DEXTOOLS_CHAINS, DextoolsChainId } from "./dextoolsChains";
 import { getTokenDecimals } from "@/utils/constants/tokenDecimals";
+import {
+  getCachedPrice,
+  setCachedPrice,
+  filterTokensNeedingFetch,
+  getCachedPricesForTokens,
+} from "./priceCache";
 
 export interface TokenPriceResult {
   price: number;
@@ -114,21 +120,36 @@ export async function fetchTokenPrices(
 ): Promise<Record<string, TokenPriceResult>> {
   if (tokens.length === 0) return {};
 
+  // Start with cached prices (valid ones)
+  const cachedPrices = getCachedPricesForTokens(tokens);
+  const results: Record<string, TokenPriceResult> = { ...cachedPrices };
+
+  // Filter to only fetch tokens that need updating
+  const tokensToFetch: TokenPriceRequest[] = filterTokensNeedingFetch(tokens);
+
+  if (tokensToFetch.length === 0) {
+    // All prices are cached and valid
+    return results;
+  }
+
   // Process sequentially to respect rate limits (1 req/sec, 1 concurrent)
-  const results: [string, TokenPriceResult][] = [];
-  
-  for (const t of tokens) {
+  for (const t of tokensToFetch) {
     const key = `${t.chain}:${t.address.toLowerCase()}`;
     try {
       const price = await fetchTokenPrice(t);
-      results.push([key, price]);
-    } catch {
+      results[key] = price;
+      // Cache the newly fetched price
+      setCachedPrice(t.chain, t.address, price);
+    } catch (error) {
       // On failure, surface a zeroed price instead of breaking the whole query
-      results.push([key, { price: 0, price24h: 0, variation24h: 0 }]);
+      const zeroPrice = { price: 0, price24h: 0, variation24h: 0 };
+      results[key] = zeroPrice;
+      console.error("[DEXTools] Price fetch failed:", { key, error });
+      // Don't cache failures
     }
   }
 
-  return Object.fromEntries(results);
+  return results;
 }
 
 // Helper to build the DEXTools key we use in maps
