@@ -67,7 +67,7 @@ export default function HomePage() {
               { key: "add", iconSrc: "/icons/plus.svg", label: "Add", onClick: () => setAddOpen(true) },
               { key: "borrow", iconSrc: "/icons/arrow-down-right.svg", label: "Borrow", href: "/borrow" },
               { key: "repay", iconSrc: "/icons/arrow-down-tray.svg", label: "Repay", href: "/repayments" },
-              { key: "earn", iconSrc: "/icons/arrow-trending-up.svg", label: "Earn", href: "/coming-soon" },
+              { key: "earn", iconSrc: "/icons/arrow-trending-up.svg", label: "Earn", href: "/earn" },
             ]), [])}
           />
         </section>
